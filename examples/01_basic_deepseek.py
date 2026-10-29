@@ -4,11 +4,11 @@
 Example 01: 基础调用演示 (OpenAI SDK + DeepSeek API)
 对应专栏第 02 篇第一节：传统的“无状态、单次问答”裸奔调用方式。
 
-【生成该代码的 AI 提示词】：
-请使用 Python 3 和官方 openai 库（连接 DeepSeek API，base_url="https://api.deepseek.com"，模型 deepseek-chat），编写一段最简的单次问答调用代码：
-1. 从环境变量 DEEPSEEK_API_KEY 中读取密钥并初始化 OpenAI 客户端；
-2. 向模型发送一条简单的测试问答（如“你好！请问你能帮我干活吗？”）；
-3. 打印出大模型的回复内容。
+【生成基础调用代码的提示词】：
+在 study-harness 项目根目录下，直接创建并写入 01_basic_deepseek.py 文件：
+1. 使用官方 openai 库连接 DeepSeek（base_url="https://api.deepseek.com"，模型 deepseek-chat）；
+2. 从环境变量 DEEPSEEK_API_KEY 读取密钥；
+3. 发送单次问答测试（“你好！请问你能帮我干活吗？”）并打印回复。
 """
 
 import os

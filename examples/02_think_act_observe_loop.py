@@ -4,16 +4,16 @@
 Example 02: Think-Act-Observe 三级循环与工具调用完整演示
 对应专栏第 02 篇第三节：单文件手搓状态机闭环引擎。
 
-【生成该代码的 AI 提示词】：
-请使用 Python 3 和官方 openai 库（连接 DeepSeek API，base_url="https://api.deepseek.com"，模型 deepseek-chat），编写一个单文件自闭环的 Think-Act-Observe 智能体运行循环：
-1. 工具实现：在同一个文件内实现两个本地文件操作函数：read_file(file_path: str) 用于读取文本，write_file(file_path: str, content: str) 用于写入文本，并编写对应的 OpenAI 标准 Tools Schema 描述表；
-2. 状态机主循环：编写 run_harness_loop(user_task: str, max_turns: int = 5) 函数，维护 messages 上下文列表，启动 while 循环；
-3. 三级循环流转：
-   - Think：将上下文传给模型，如果模型未返回 tool_calls，打印最终结论并结束退出；
-   - Act：如果模型返回 tool_calls，解析函数名与参数，调用本地对应的真实函数执行物理操作；
-   - Observe：捕获函数执行的真实结果或报错，打包成 role: 'tool' 的消息塞回 messages 记忆队列，驱动进入下一轮思考；
-4. 安全机制：设置 max_turns 步数上限，超时强制刹车熔断防死循环；
-5. 测试入口：在 __main__ 中写入一个“读取本地原始笔记.txt、提炼核心方法论并写入提炼报告.txt”的完整端到端测试。
+【生成核心循环代码的提示词】：
+在 study-harness 项目根目录下，直接编写并写入 02_think_act_observe_loop.py 文件：
+1. 使用 openai 库连接 DeepSeek（deepseek-chat，base_url="https://api.deepseek.com"）；
+2. 实现两个本地文件工具 read_file 与 write_file，并定义标准 Tools Schema；
+3. 编写 run_harness_loop(user_task, max_turns=5)，用 while 循环实现 Think、Act、Observe 三级状态流转：
+   - Think：向模型发送上下文。若无 tool_calls，打印结论并退出；
+   - Act：解析 tool_calls 并执行本地工具；
+   - Observe：将执行结果以 role: "tool" 塞回上下文，触发下一轮思考；
+4. max_turns 步数超限强制刹车；
+5. 在 __main__ 写入测试：读取“原始笔记.txt”，提炼核心方法论并写入“提炼报告.txt”。
 """
 
 import os
