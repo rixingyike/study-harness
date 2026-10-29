@@ -42,7 +42,7 @@ client = OpenAI(
 # ----------------------------------------------------
 def read_file(file_path: str) -> str:
     """读取指定路径的本地文本文件"""
-    print(f"  [物理操作 Act] 正在打开并读取本地文件：{file_path}")
+    print(f"[物理操作 Act] 正在打开并读取本地文件：{file_path}")
     try:
         if not os.path.exists(file_path):
             return f"错误：文件 {file_path} 根本不存在，请核对路径。"
@@ -53,7 +53,7 @@ def read_file(file_path: str) -> str:
 
 def write_file(file_path: str, content: str) -> str:
     """向指定路径写入文本文件"""
-    print(f"  [物理操作 Act] 正在向本地文件写入内容：{file_path}")
+    print(f"[物理操作 Act] 正在向本地文件写入内容：{file_path}")
     try:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
@@ -131,7 +131,7 @@ def run_harness_loop(user_task: str, max_turns: int = 5):
         
         # 步骤一：【Think 思考】
         # 把全部上下文喂给大模型，让它结合当前进展决定下一步
-        print(f"  [思考中 Think] 大模型正在审视历史并盘算策略...")
+        print(f"[思考中 Think] 大模型正在审视历史并盘算策略...")
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=messages,
@@ -153,7 +153,7 @@ def run_harness_loop(user_task: str, max_turns: int = 5):
             tool_name = tool_call.function.name
             tool_args = json.loads(tool_call.function.arguments)
             
-            print(f"  [意图确认] 大模型决定动用工具：{tool_name}，参数：{tool_args}")
+            print(f"[意图确认] 大模型决定动用工具：{tool_name}，参数：{tool_args}")
             
             # 【Act 真实行动】
             func = TOOL_MAP.get(tool_name)
@@ -163,7 +163,7 @@ def run_harness_loop(user_task: str, max_turns: int = 5):
                 observation = f"错误：未注册的工具名称 {tool_name}"
             
             # 【Observe 真实观察】
-            print(f"  [环境反馈 Observe] 物理世界返回客观事实：{observation}")
+            print(f"[环境反馈 Observe] 物理世界返回客观事实：{observation}")
             
             # 将工具产出的真实观察事实，打包成 role: 'tool' 的消息塞回记忆
             messages.append({
