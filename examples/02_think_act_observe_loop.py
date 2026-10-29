@@ -3,6 +3,17 @@
 """
 Example 02: Think-Act-Observe 三级循环与工具调用完整演示
 对应专栏第 02 篇第三节：单文件手搓状态机闭环引擎。
+
+【生成该代码的 AI 提示词】：
+请使用 Python 3 和官方 openai 库（连接 DeepSeek API，base_url="https://api.deepseek.com"，模型 deepseek-chat），编写一个单文件自闭环的 Think-Act-Observe 智能体运行循环：
+1. 工具实现：在同一个文件内实现两个本地文件操作函数：read_file(file_path: str) 用于读取文本，write_file(file_path: str, content: str) 用于写入文本，并编写对应的 OpenAI 标准 Tools Schema 描述表；
+2. 状态机主循环：编写 run_harness_loop(user_task: str, max_turns: int = 5) 函数，维护 messages 上下文列表，启动 while 循环；
+3. 三级循环流转：
+   - Think：将上下文传给模型，如果模型未返回 tool_calls，打印最终结论并结束退出；
+   - Act：如果模型返回 tool_calls，解析函数名与参数，调用本地对应的真实函数执行物理操作；
+   - Observe：捕获函数执行的真实结果或报错，打包成 role: 'tool' 的消息塞回 messages 记忆队列，驱动进入下一轮思考；
+4. 安全机制：设置 max_turns 步数上限，超时强制刹车熔断防死循环；
+5. 测试入口：在 __main__ 中写入一个“读取本地原始笔记.txt、提炼核心方法论并写入提炼报告.txt”的完整端到端测试。
 """
 
 import os
