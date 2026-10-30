@@ -17,6 +17,14 @@ ENV/
 .coverage
 htmlcov/
 
+# Node / Frontend
+node_modules/
+dist/
+
+# Database
+*.db
+*.sqlite3
+
 # IDE
 .idea/
 .vscode/
