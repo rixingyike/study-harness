@@ -253,8 +253,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-
-const API_BASE = '/api'
+import { chatApi } from './api'
 
 // 状态管理
 const sessions = ref([])
@@ -332,15 +331,12 @@ const scrollToTop = async () => {
 // 获取会话列表
 const fetchSessions = async () => {
   try {
-    const res = await fetch(`${API_BASE}/sessions`)
-    if (res.ok) {
-      sessions.value = await res.json()
-      // 如果当前没有选中会话且有历史会话，默认选中第一个
-      if (!currentSessionId.value && sessions.value.length > 0) {
-        await switchSession(sessions.value[0].id)
-      } else if (sessions.value.length === 0) {
-        await createNewSession()
-      }
+    sessions.value = await chatApi.getSessions()
+    // 如果当前没有选中会话且有历史会话，默认选中第一个
+    if (!currentSessionId.value && sessions.value.length > 0) {
+      await switchSession(sessions.value[0].id)
+    } else if (sessions.value.length === 0) {
+      await createNewSession()
     }
   } catch (err) {
     console.error('获取会话失败:', err)
@@ -358,11 +354,8 @@ const switchSession = async (sessionId) => {
   if (currentSessionId.value === sessionId) return
   currentSessionId.value = sessionId
   try {
-    const res = await fetch(`${API_BASE}/sessions/${sessionId}/messages`)
-    if (res.ok) {
-      messages.value = await res.json()
-      scrollToTop()
-    }
+    messages.value = await chatApi.getMessages(sessionId)
+    scrollToTop()
   } catch (err) {
     console.error('获取消息失败:', err)
   }
@@ -377,18 +370,11 @@ const handleCreateSession = async () => {
 // 新建会话核心逻辑
 const createNewSession = async () => {
   try {
-    const res = await fetch(`${API_BASE}/sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: '新建对话' })
-    })
-    if (res.ok) {
-      const newSession = await res.json()
-      sessions.value.unshift(newSession)
-      currentSessionId.value = newSession.id
-      messages.value = []
-      scrollToTop()
-    }
+    const newSession = await chatApi.createSession('新建对话')
+    sessions.value.unshift(newSession)
+    currentSessionId.value = newSession.id
+    messages.value = []
+    scrollToTop()
   } catch (err) {
     console.error('新建会话失败:', err)
   }
@@ -398,15 +384,13 @@ const createNewSession = async () => {
 const deleteSession = async (sessionId) => {
   if (!confirm('确定删除此对话吗？')) return
   try {
-    const res = await fetch(`${API_BASE}/sessions/${sessionId}`, { method: 'DELETE' })
-    if (res.ok) {
-      sessions.value = sessions.value.filter(s => s.id !== sessionId)
-      if (currentSessionId.value === sessionId) {
-        if (sessions.value.length > 0) {
-          await switchSession(sessions.value[0].id)
-        } else {
-          await createNewSession()
-        }
+    await chatApi.deleteSession(sessionId)
+    sessions.value = sessions.value.filter(s => s.id !== sessionId)
+    if (currentSessionId.value === sessionId) {
+      if (sessions.value.length > 0) {
+        await switchSession(sessions.value[0].id)
+      } else {
+        await createNewSession()
       }
     }
   } catch (err) {
@@ -438,20 +422,13 @@ const handleSendMessage = async () => {
   scrollToTop()
 
   try {
-    const res = await fetch(`${API_BASE}/sessions/${currentSessionId.value}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: text })
-    })
-    if (res.ok) {
-      const assistantMsg = await res.json()
-      messages.value.push(assistantMsg)
-      // 若这是首条互动，刷新会话标题
-      if (messages.value.length <= 2) {
-        const cur = sessions.value.find(s => s.id === currentSessionId.value)
-        if (cur && cur.title === '新建对话') {
-          cur.title = text.split('\n')[0].slice(0, 20) || '新建对话'
-        }
+    const assistantMsg = await chatApi.sendMessage(currentSessionId.value, text)
+    messages.value.push(assistantMsg)
+    // 若这是首条互动，刷新会话标题
+    if (messages.value.length <= 2) {
+      const cur = sessions.value.find(s => s.id === currentSessionId.value)
+      if (cur && cur.title === '新建对话') {
+        cur.title = text.split('\n')[0].slice(0, 20) || '新建对话'
       }
     }
   } catch (err) {
