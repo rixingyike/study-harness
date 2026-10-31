@@ -73,7 +73,7 @@ def get_db():
     return conn
 
 def init_db():
-    # 在这一个地方只执行一次：SQLModel 自动把上面定义好的 Pydantic 模型作为表结构，写进 SQLite 数据库文件里去
+    # 核心：自动扫描所有 table=True 的模型；已存在则自动跳过，绝不重复建表或覆盖历史数据
     SQLModel.metadata.create_all(engine)
 
 init_db()
