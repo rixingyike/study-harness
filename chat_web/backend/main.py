@@ -9,7 +9,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from sqlmodel import SQLModel, Field, create_engine
 from openai import OpenAI
 
 # ----------------- 环境与配置 -----------------
@@ -36,29 +37,35 @@ def load_deepseek_env():
                         base_url = line.split("=", 1)[1].strip().strip("'\"")
     return api_key, base_url
 
-# ----------------- 数据模型 (Pydantic v2) -----------------
-class SessionItem(BaseModel):
-    id: str
-    title: str
+# ----------------- 数据模型与库表结构 (SQLModel: 继承 Pydantic BaseModel) -----------------
+class SessionItem(SQLModel, table=True):
+    __tablename__ = "sessions"
+    __table_args__ = {"extend_existing": True}
+    id: str = Field(primary_key=True)
+    title: str = Field(default="新建对话")
     created_at: str
     updated_at: str
 
-class MessageItem(BaseModel):
-    id: str
-    session_id: str
+class MessageItem(SQLModel, table=True):
+    __tablename__ = "messages"
+    __table_args__ = {"extend_existing": True}
+    id: str = Field(primary_key=True)
+    session_id: str = Field(index=True)
     role: str  # 'user' | 'assistant'
     content: str
-    thinking: Optional[str] = None  # 从发出提示语到最终结果之间的思考与推演全记录
+    thinking: Optional[str] = Field(default=None)  # 从发出提示语到最终结果之间的思考与推演全记录
     created_at: str
 
-class SendMessageRequest(BaseModel):
-    content: str = Field(..., min_length=1, description="用户发送的消息内容")
+class SendMessageRequest(SQLModel):
+    content: str = Field(min_length=1, description="用户发送的消息内容")
 
-class CreateSessionRequest(BaseModel):
+class CreateSessionRequest(SQLModel):
     title: Optional[str] = "新建对话"
 
-# ----------------- 数据库初始化 (SQLite) -----------------
+# ----------------- 数据库引擎与自动建表 (SQLModel + SQLite) -----------------
 DB_PATH = os.path.join(os.path.dirname(__file__), "chat.db")
+sqlite_url = f"sqlite:///{DB_PATH}"
+engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -66,32 +73,8 @@ def get_db():
     return conn
 
 def init_db():
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                thinking TEXT,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
-            )
-        """)
-        # 兼容旧表升级：检查并自动补充 thinking 字段
-        cursor = conn.execute("PRAGMA table_info(messages)")
-        columns = [row["name"] for row in cursor.fetchall()]
-        if "thinking" not in columns:
-            conn.execute("ALTER TABLE messages ADD COLUMN thinking TEXT")
-        conn.commit()
+    # 在这一个地方只执行一次：SQLModel 自动把上面定义好的 Pydantic 模型作为表结构，写进 SQLite 数据库文件里去
+    SQLModel.metadata.create_all(engine)
 
 init_db()
 
@@ -449,4 +432,4 @@ if __name__ == "__main__":
     print(f" 挂载前端路径: {FRONTEND_DIST}")
     print(f" 状态机引擎  : 已融合第二篇 Think-Act-Observe 核心循环")
     print(f"==================================================")
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=port)
