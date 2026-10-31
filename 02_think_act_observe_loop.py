@@ -37,6 +37,8 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+
 # ----------------------------------------------------
 # 2. 本地真实工具函数（这是智能体能触碰物理世界的“双手”）
 # ----------------------------------------------------
@@ -44,9 +46,12 @@ def read_file(file_path: str) -> str:
     """读取指定路径的本地文本文件"""
     print(f"[物理操作 Act] 正在打开并读取本地文件：{file_path}")
     try:
-        if not os.path.exists(file_path):
+        target = Path(file_path)
+        if not target.is_absolute():
+            target = PROJECT_ROOT / target
+        if not target.exists():
             return f"错误：文件 {file_path} 根本不存在，请核对路径。"
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(target, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
         return f"读取文件时发生异常：{str(e)}"
@@ -55,7 +60,10 @@ def write_file(file_path: str, content: str) -> str:
     """向指定路径写入文本文件"""
     print(f"[物理操作 Act] 正在向本地文件写入内容：{file_path}")
     try:
-        with open(file_path, "w", encoding="utf-8") as f:
+        target = Path(file_path)
+        if not target.is_absolute():
+            target = PROJECT_ROOT / target
+        with open(target, "w", encoding="utf-8") as f:
             f.write(content)
         return f"成功：已成功向 {file_path} 写入 {len(content)} 个字符。"
     except Exception as e:

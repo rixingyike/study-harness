@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import sqlite3
 import uuid
@@ -9,35 +10,18 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 from sqlmodel import SQLModel, Field, create_engine
-from openai import OpenAI
+import importlib
 
-# ----------------- 环境与配置 -----------------
-BACKEND_DIR = Path(__file__).resolve().parent
+# ----------------- 路径与第二篇 Harness 核心循环引擎复用 -----------------
 STUDY_HARNESS_ROOT = Path(__file__).resolve().parents[2]
+if str(STUDY_HARNESS_ROOT) not in sys.path:
+    sys.path.insert(0, str(STUDY_HARNESS_ROOT))
 
-def load_deepseek_env():
-    """从 study-harness 根目录或相关目录加载 .env 配置"""
-    api_key = os.environ.get("DEEPSEEK_API_KEY")
-    base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-    candidates = [
-        STUDY_HARNESS_ROOT / ".env",
-        BACKEND_DIR.parent / ".env",
-        BACKEND_DIR / ".env"
-    ]
-    for env_path in candidates:
-        if (not api_key or "你的" in api_key) and env_path.exists():
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("DEEPSEEK_API_KEY="):
-                        api_key = line.split("=", 1)[1].strip().strip("'\"")
-                    elif line.startswith("DEEPSEEK_BASE_URL="):
-                        base_url = line.split("=", 1)[1].strip().strip("'\"")
-    return api_key, base_url
+# 直接复用第二篇的单文件状态机引擎（包含配置好的 client、物理工具 TOOL_MAP 与描述表 tools）
+ch02 = importlib.import_module("02_think_act_observe_loop")
 
-# ----------------- 数据模型与库表结构 (SQLModel: 继承 Pydantic BaseModel) -----------------
+# ----------------- 数据模型与库表结构 (SQLModel) -----------------
 class SessionItem(SQLModel, table=True):
     __tablename__ = "sessions"
     __table_args__ = {"extend_existing": True}
@@ -53,7 +37,7 @@ class MessageItem(SQLModel, table=True):
     session_id: str = Field(index=True)
     role: str  # 'user' | 'assistant'
     content: str
-    thinking: Optional[str] = Field(default=None)  # 从发出提示语到最终结果之间的思考与推演全记录
+    thinking: Optional[str] = Field(default=None)  # 思考与推演全记录
     created_at: str
 
 class SendMessageRequest(SQLModel):
@@ -78,123 +62,20 @@ def init_db():
 
 init_db()
 
-# ----------------- 第二篇 Harness 核心工具与循环状态机融合 -----------------
-def tool_read_file(file_path: str) -> str:
-    """读取指定本地文件的内容"""
-    try:
-        target = (STUDY_HARNESS_ROOT / file_path).resolve()
-        if not target.exists():
-            return f"错误：文件 {file_path} 并不存在。"
-        with open(target, "r", encoding="utf-8") as f:
-            content = f.read()
-            return content if len(content) <= 3000 else content[:3000] + "\n...(后略)"
-    except Exception as e:
-        return f"读取文件异常: {str(e)}"
-
-def tool_write_file(file_path: str, content: str) -> str:
-    """向指定本地路径写入文本文件"""
-    try:
-        target = (STUDY_HARNESS_ROOT / file_path).resolve()
-        with open(target, "w", encoding="utf-8") as f:
-            f.write(content)
-        return f"成功：已成功向 {file_path} 写入 {len(content)} 个字符。"
-    except Exception as e:
-        return f"写入文件异常: {str(e)}"
-
-def tool_list_files(directory: str = ".") -> str:
-    """列出指定目录下的文件清单"""
-    try:
-        target = (STUDY_HARNESS_ROOT / directory).resolve()
-        if not target.exists():
-            return f"错误：目录 {directory} 不存在。"
-        files = [f for f in os.listdir(target) if not f.startswith(".")]
-        return f"目录 [{directory}] 下的文件：{', '.join(files[:30])}"
-    except Exception as e:
-        return f"列出目录异常: {str(e)}"
-
-TOOL_MAP = {
-    "read_file": tool_read_file,
-    "write_file": tool_write_file,
-    "list_files": tool_list_files
-}
-
-TOOLS_SCHEMA = [
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "读取本地文件内容的工具（支持相对路径如 '01_basic_deepseek.py' 或测试文件）",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string", "description": "要读取的文件相对路径"}
-                },
-                "required": ["file_path"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "write_file",
-            "description": "向本地写入纯文本内容的工具",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string", "description": "要写入的文件相对路径"},
-                    "content": {"type": "string", "description": "要写入的纯文本内容"}
-                },
-                "required": ["file_path", "content"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_files",
-            "description": "列出指定本地目录下的文件列表",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "directory": {"type": "string", "description": "目录相对路径，默认为当前根目录 '.'"}
-                }
-            }
-        }
-    }
-]
-
+# ----------------- 复用第二篇状态机并收集思考日志 -----------------
 def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns: int = 5) -> tuple[str, str]:
     """
-    融合第二篇 Think -> Act -> Observe 核心循环引擎
-    从发出提示语开始，在拿到最后交付结果前，记录所有的思考与推演步骤
-    返回: (thinking_logs, final_content)
+    直接借用第二篇的 client、tools 与 TOOL_MAP，
+    一边驱动 Think -> Act -> Observe 循环，一边收集思考日志供前端折叠展示。
     """
-    api_key, base_url = load_deepseek_env()
+    client = ch02.client
+    tools = ch02.tools
+    tool_map = ch02.TOOL_MAP
+
     thinking_logs = []
-
-    # 若未配置有效 API KEY，启用高保真推理模拟流
-    if not api_key or "你的" in api_key:
-        thinking_logs.append("【第 1 轮思考 Think】分析用户提示语意图，审视历史会话上下文...")
-        thinking_logs.append("【工具规划 Act】检测本地工具库（read_file、write_file、list_files）...")
-        thinking_logs.append("【环境观察 Observe】当前处于极简离线模式，组织综合回复策略。")
-        final = f"已收到您的提问：“{user_prompt}”。\n\n当前已融合专栏第二篇的 Think-Act-Observe 状态机循环。在 study-harness/.env 中配置 DEEPSEEK_API_KEY 即可实时触发真实的云端思考与物理工具调用。"
-        return "\n\n".join(thinking_logs), final
-
-    client = OpenAI(api_key=api_key, base_url=base_url)
-
-    # 准备上下文记忆
     context_msgs = [
-        {
-            "role": "system",
-            "content": (
-                "你是一个脚踏实地的智能助手（运行在 Harness 架构下）。"
-                "你可以使用提供的本地工具（read_file、write_file、list_files）探查物理文件并解决任务。"
-                "在最后拿到结果前，请根据需要调用工具搜集事实。如果无需动用工具，请直接给出逻辑严密、表达清晰的中文回复。"
-            )
-        }
+        {"role": "system", "content": "你是一位脚踏实地的智能助手。请善用本地工具搜集事实后再下结论。"}
     ]
-
-    # 装载当前会话的历史上下文（取最近 6 条）
     for m in history_messages[-6:]:
         context_msgs.append({"role": m["role"], "content": m["content"]})
     context_msgs.append({"role": "user", "content": user_prompt})
@@ -206,47 +87,37 @@ def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns
         turn += 1
         thinking_logs.append(f"--- 【第 {turn} 轮循环 Think】模型正在审视上下文并盘算策略 ---")
 
-        try:
-            response = client.chat.completions.create(
-                model="deepseek-chat",
-                messages=context_msgs,
-                tools=TOOLS_SCHEMA,
-                temperature=0.2
-            )
-        except Exception as e:
-            thinking_logs.append(f"【异常报警】调用接口失败: {str(e)}")
-            final_content = f"执行过程中遭遇接口异常：{str(e)}"
-            break
-
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=context_msgs,
+            tools=tools,
+            temperature=0.2
+        )
         msg = response.choices[0].message
         context_msgs.append(msg)
 
-        # 捕获深度推理思维链（如模型自身携带的 reasoning_content）
         reasoning = getattr(msg, "reasoning_content", None)
         if reasoning:
             thinking_logs.append(f"【深度推演 Reasoning】\n{reasoning.strip()}")
 
-        # 分支判断：无需工具调用即为任务终点
+        # 没有工具调用，说明思考收敛，推导出最终结论
         if not msg.tool_calls:
             thinking_logs.append("【思考收敛 Finish】模型判断事实搜集完整，推导得出最终交付成果。")
             final_content = msg.content or "（任务已执行完毕）"
             break
 
-        # 执行工具调用 (Act -> Observe)
+        # 触发工具调用 (Act -> Observe)
         for tc in msg.tool_calls:
             func_name = tc.function.name
             try:
-                func_args = json.loads(tc.function.arguments)
+                func_args = json.loads(tc.function.arguments) if tc.function.arguments else {}
             except Exception:
                 func_args = {}
 
             thinking_logs.append(f"【行动 Act】决定动用物理工具：{func_name}，参数：{json.dumps(func_args, ensure_ascii=False)}")
 
-            func = TOOL_MAP.get(func_name)
-            if func:
-                observation = func(**func_args)
-            else:
-                observation = f"错误：未注册的工具 {func_name}"
+            func = tool_map.get(func_name)
+            observation = func(**func_args) if func else f"错误：未注册的工具 {func_name}"
 
             obs_text = str(observation)
             obs_preview = obs_text if len(obs_text) <= 300 else obs_text[:300] + "...(后略)"
@@ -264,7 +135,7 @@ def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns
 
     return "\n\n".join(thinking_logs), final_content
 
-# ----------------- FastAPI 应用 -----------------
+# ----------------- FastAPI 应用与路由 -----------------
 app = FastAPI(title="Study-Harness AI Web 控制台", version="2.0.0")
 
 app.add_middleware(
@@ -277,7 +148,6 @@ app.add_middleware(
 
 @app.get("/api/sessions", response_model=List[SessionItem])
 def list_sessions():
-    """获取所有历史会话列表，按最后更新时间倒序排列"""
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM sessions ORDER BY updated_at DESC").fetchall()
         return [
@@ -292,7 +162,6 @@ def list_sessions():
 
 @app.post("/api/sessions", response_model=SessionItem)
 def create_session(req: CreateSessionRequest):
-    """新建一个聊天会话"""
     session_id = str(uuid.uuid4())
     now_str = datetime.now().isoformat()
     with get_db() as conn:
@@ -305,7 +174,6 @@ def create_session(req: CreateSessionRequest):
 
 @app.delete("/api/sessions/{session_id}")
 def delete_session(session_id: str):
-    """删除指定会话及所有关联消息"""
     with get_db() as conn:
         conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
         cursor = conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
@@ -316,7 +184,6 @@ def delete_session(session_id: str):
 
 @app.get("/api/sessions/{session_id}/messages", response_model=List[MessageItem])
 def list_messages(session_id: str):
-    """获取指定会话的所有历史消息（包含思考过程）"""
     with get_db() as conn:
         sess = conn.execute("SELECT id FROM sessions WHERE id = ?", (session_id,)).fetchone()
         if not sess:
@@ -339,19 +206,13 @@ def list_messages(session_id: str):
 
 @app.post("/api/sessions/{session_id}/messages", response_model=MessageItem)
 def send_message(session_id: str, req: SendMessageRequest):
-    """
-    发送消息：融合第二篇 Think -> Act -> Observe 核心循环引擎
-    记录全流程思考与行动，返回最终结果与灰色折叠思考日志
-    """
-    now = datetime.now()
-    now_str = now.isoformat()
-
+    now_str = datetime.now().isoformat()
     with get_db() as conn:
         sess = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
         if not sess:
             raise HTTPException(status_code=404, detail="会话不存在")
 
-        # 检查是否是首条消息，用于更新会话标题
+        # 首问截取会话标题
         msg_count = conn.execute(
             "SELECT COUNT(*) as cnt FROM messages WHERE session_id = ?",
             (session_id,)
@@ -369,7 +230,7 @@ def send_message(session_id: str, req: SendMessageRequest):
                 (now_str, session_id)
             )
 
-        # 1. 存入用户提问
+        # 存入用户消息
         user_msg_id = str(uuid.uuid4())
         conn.execute(
             "INSERT INTO messages (id, session_id, role, content, thinking, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -377,17 +238,17 @@ def send_message(session_id: str, req: SendMessageRequest):
         )
         conn.commit()
 
-        # 读取前置上下文传给引擎
+        # 读取前置上下文
         history_rows = conn.execute(
             "SELECT role, content FROM messages WHERE session_id = ? AND id != ? ORDER BY created_at ASC",
             (session_id, user_msg_id)
         ).fetchall()
         history_list = [{"role": r["role"], "content": r["content"]} for r in history_rows]
 
-    # 2. 调用融合自第二篇的 Harness 核心循环状态机
+    # 直接调用融合第二篇核心的循环状态机
     thinking_process, final_reply = run_harness_engine(history_list, req.content)
 
-    # 3. 持久化存储助手消息与思考过程
+    # 存入助手回复与思考日志
     assistant_msg_id = str(uuid.uuid4())
     assistant_now_str = datetime.now().isoformat()
     with get_db() as conn:
@@ -410,7 +271,7 @@ def send_message(session_id: str, req: SendMessageRequest):
         created_at=assistant_now_str
     )
 
-# ----------------- 静态托管前端生产页面 -----------------
+# ----------------- 静态托管前端页面 -----------------
 FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "../frontend/dist"))
 
 if os.path.exists(FRONTEND_DIST):
@@ -429,7 +290,6 @@ if __name__ == "__main__":
     print(f"==================================================")
     print(f" Study-Harness AI 控制台启动中...")
     print(f" 本地访问地址: http://127.0.0.1:{port}")
-    print(f" 挂载前端路径: {FRONTEND_DIST}")
-    print(f" 状态机引擎  : 已融合第二篇 Think-Act-Observe 核心循环")
+    print(f" 状态机引擎  : 已直接复用第二篇 02_think_act_observe_loop")
     print(f"==================================================")
     uvicorn.run(app, host="0.0.0.0", port=port)
