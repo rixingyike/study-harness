@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import sqlite3
 import uuid
@@ -11,15 +10,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, Field, create_engine
-import importlib
+from openai import OpenAI
 
-# ----------------- 路径与第二篇 Harness 核心循环引擎复用 -----------------
-STUDY_HARNESS_ROOT = Path(__file__).resolve().parents[2]
-if str(STUDY_HARNESS_ROOT) not in sys.path:
-    sys.path.insert(0, str(STUDY_HARNESS_ROOT))
+# ----------------- 路径与环境配置 -----------------
+BACKEND_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# 直接复用第二篇的单文件状态机引擎（包含配置好的 client、物理工具 TOOL_MAP 与描述表 tools）
-ch02 = importlib.import_module("02_think_act_observe_loop")
+def load_deepseek_env():
+    """从本地或项目根目录加载 .env 配置"""
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    candidates = [
+        BACKEND_DIR / ".env",
+        BACKEND_DIR.parent / ".env",
+        PROJECT_ROOT / ".env"
+    ]
+    for env_path in candidates:
+        if env_path.exists() and (not api_key or "你的" in api_key):
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("DEEPSEEK_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip().strip("'\"")
+                    elif line.startswith("DEEPSEEK_BASE_URL="):
+                        base_url = line.split("=", 1)[1].strip().strip("'\"")
+    return api_key, base_url
 
 # ----------------- 数据模型与库表结构 (SQLModel) -----------------
 class SessionItem(SQLModel, table=True):
@@ -62,15 +77,77 @@ def init_db():
 
 init_db()
 
-# ----------------- 复用第二篇状态机并收集思考日志 -----------------
+# ----------------- Harness 核心物理工具与 Schema -----------------
+def read_file(file_path: str) -> str:
+    """读取指定本地文件的内容"""
+    try:
+        target = Path(file_path)
+        if not target.is_absolute():
+            target = PROJECT_ROOT / target
+        if not target.exists():
+            return f"错误：文件 {file_path} 并不存在。"
+        with open(target, "r", encoding="utf-8") as f:
+            content = f.read()
+            return content if len(content) <= 3000 else content[:3000] + "\n...(后略)"
+    except Exception as e:
+        return f"读取文件异常: {str(e)}"
+
+def write_file(file_path: str, content: str) -> str:
+    """向指定本地路径写入纯文本内容"""
+    try:
+        target = Path(file_path)
+        if not target.is_absolute():
+            target = PROJECT_ROOT / target
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"成功：已成功向 {file_path} 写入 {len(content)} 个字符。"
+    except Exception as e:
+        return f"写入文件异常: {str(e)}"
+
+TOOL_MAP = {
+    "read_file": read_file,
+    "write_file": write_file
+}
+
+TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "读取本地文件内容的工具",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "要读取的文件相对路径"}
+                },
+                "required": ["file_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "向本地写入纯文本内容的工具",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "要写入的文件相对路径"},
+                    "content": {"type": "string", "description": "要写入的纯文本内容"}
+                },
+                "required": ["file_path", "content"]
+            }
+        }
+    }
+]
+
+# ----------------- 核心状态机循环引擎 (Think -> Act -> Observe) -----------------
 def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns: int = 5) -> tuple[str, str]:
     """
-    直接借用第二篇的 client、tools 与 TOOL_MAP，
-    一边驱动 Think -> Act -> Observe 循环，一边收集思考日志供前端折叠展示。
+    驱动 Think -> Act -> Observe 状态机循环，一边推演一边收集思考日志供前端折叠展示
     """
-    client = ch02.client
-    tools = ch02.tools
-    tool_map = ch02.TOOL_MAP
+    api_key, base_url = load_deepseek_env()
+    client = OpenAI(api_key=api_key, base_url=base_url)
 
     thinking_logs = []
     context_msgs = [
@@ -90,7 +167,7 @@ def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=context_msgs,
-            tools=tools,
+            tools=TOOLS_SCHEMA,
             temperature=0.2
         )
         msg = response.choices[0].message
@@ -106,7 +183,7 @@ def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns
             final_content = msg.content or "（任务已执行完毕）"
             break
 
-        # 触发工具调用 (Act -> Observe)
+        # 触发工具调用 (Act 行动 -> Observe 观察)
         for tc in msg.tool_calls:
             func_name = tc.function.name
             try:
@@ -116,7 +193,7 @@ def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns
 
             thinking_logs.append(f"【行动 Act】决定动用物理工具：{func_name}，参数：{json.dumps(func_args, ensure_ascii=False)}")
 
-            func = tool_map.get(func_name)
+            func = TOOL_MAP.get(func_name)
             observation = func(**func_args) if func else f"错误：未注册的工具 {func_name}"
 
             obs_text = str(observation)
@@ -245,7 +322,7 @@ def send_message(session_id: str, req: SendMessageRequest):
         ).fetchall()
         history_list = [{"role": r["role"], "content": r["content"]} for r in history_rows]
 
-    # 直接调用融合第二篇核心的循环状态机
+    # 直接调用内聚的状态机循环引擎
     thinking_process, final_reply = run_harness_engine(history_list, req.content)
 
     # 存入助手回复与思考日志
@@ -290,6 +367,6 @@ if __name__ == "__main__":
     print(f"==================================================")
     print(f" Study-Harness AI 控制台启动中...")
     print(f" 本地访问地址: http://127.0.0.1:{port}")
-    print(f" 状态机引擎  : 已直接复用第二篇 02_think_act_observe_loop")
+    print(f" 状态机引擎  : 内聚状态机循环引擎 (Think -> Act -> Observe)")
     print(f"==================================================")
     uvicorn.run(app, host="0.0.0.0", port=port)
