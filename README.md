@@ -9,7 +9,7 @@
 * **第 01 讲**：大模型 API 底层通信与前缀缓存（Prompt Caching）极简原理
 * **第 02 讲**：Think-Act-Observe 思考-行动-观察三元核心回路
 * **第 03 讲**：[`chat_web/`](./chat_web) - 现代多轮对话交互控制台（FastAPI + Vue3 + SQLite 历史会话持久化）
-* **第 04 讲**：[`start_kitty.sh`](./start_kitty.sh) - 极简终端守护脚本（Kitty IPC + tmux 会话保活，高效复用终端 AI）
+* **第 04 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）与 [`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）
 
 ---
 
@@ -115,3 +115,110 @@ WantedBy=multi-user.target
   ```
 
 有 `systemd` 在底层保驾护航，配合脚本内部的 Socket 活跃防重检测与失效自愈逻辑，无论服务器怎么重启，后台 AI 终端都能够全天候稳定在线。
+
+---
+
+## 客户端实战：macOS 本地一键直连与密钥免密登录
+
+搞定了服务端的终端保活后，平时我们在个人电脑（如 macOS）上做开发时，怎样做到“一条指令瞬间直达云端 AI 终端”？
+
+### 6. macOS 本地一键直连脚本 (`connect.sh`)
+
+配套客户端脚本：[`connect.sh`](./connect.sh)
+
+```bash
+#!/bin/bash
+# macOS 本地一键直连云端 AI 终端工作区脚本
+SERVER_USER="${SERVER_USER:-ubuntu}"
+SERVER_IP="${SERVER_IP:-你的服务器公网IP}"
+PORT="${SERVER_PORT:-22}"
+
+# -t 参数强制分配伪终端（PTY），远程直接接入 tmux 会话
+exec ssh -t -p "$PORT" "${SERVER_USER}@${SERVER_IP}" "tmux attach -t workspace"
+```
+
+#### 使用方法：
+1. 赋予执行权限：
+   ```bash
+   chmod +x ./connect.sh
+   ```
+2. 直接运行：
+   ```bash
+   ./connect.sh
+   # 或者通过环境变量传入临时 IP：
+   SERVER_IP=123.45.67.89 ./connect.sh
+   ```
+   只要云服务器已启动，敲完这一行直接无缝置身于云端 `tmux workspace` 终端中！直接敲 `agy` 即可唤起 Google Gemini，按 `Ctrl+B` 然后按 `D` 安全断开，本地电脑合盖也不会打断后台任务。
+
+#### 进阶技巧：macOS 极简别名与 SSH Config 极速直达
+如果你连 `./connect.sh` 都不想敲，有两种更极致的极简配置方式：
+
+**方式 A：Shell 别名（Alias）**
+在本地 `~/.zshrc`（或 `~/.bash_profile`）中加入一行：
+```bash
+alias ai="ssh -t ubuntu@你的服务器公网IP 'tmux attach -t workspace'"
+```
+执行 `source ~/.zshrc` 生效后，在 Mac 终端里直接敲一个单词 `ai` 并回车，瞬间直达云端！
+
+**方式 B：SSH 配置文件（~/.ssh/config）**
+在 macOS 本地的 `~/.ssh/config` 中追加：
+```ssh-config
+Host ai
+    HostName 你的服务器公网IP
+    User ubuntu
+    Port 22
+    IdentityFile ~/.ssh/id_ed25519
+    RequestTTY yes
+    RemoteCommand tmux attach -t workspace
+```
+这样只需执行：
+```bash
+ssh ai
+```
+系统会自动调用指定密钥、分配 PTY 并直达 tmux 会话。
+
+---
+
+### 7. 密钥自动免密登录的底层实现原理与配置
+
+为了让一键直连完全不弹密码提示框，同时杜绝服务器被恶意爆破密码的风险，工业界一律采用 **SSH 非对称密钥认证机制**。
+
+#### (1) 底层认证原理（为什么不用输密码，且比密码更安全？）
+1. **公钥与私钥配对（非对称加密）**：
+   * **私钥（Private Key，如 `id_ed25519`）**：存放在本地 macOS 个人电脑中，权限严格受限（`chmod 600`），**绝对不能泄露给任何人**；
+   * **公钥（Public Key，如 `id_ed25519.pub`）**：存放在云端服务器的 `~/.ssh/authorized_keys` 中，相当于在服务器上挂了一把“公开的锁”。
+2. **挑战/应答握手流程（Challenge-Response Authentication）**：
+   * 当 Mac 发起连接请求时，服务器生成一串随机的字符串（“挑战包”），并用存储的公钥加密后发给 Mac；
+   * Mac 本地拿到加密包后，用自己私藏的私钥进行解密，并将解密结果与数字签名发回服务器；
+   * 服务器用公钥验证签名通过，瞬间放行登录！
+   * **整个过程密码从不在网络中传输，黑客即便截获网络流量也无法推断出私钥**。
+
+#### (2) 三步实操配置流程
+
+**第 1 步：在 macOS 本地生成高强度密钥对**
+推荐使用现代高性能的 Ed25519 算法（比传统 RSA 更快、更短、更安全）：
+```bash
+ssh-keygen -t ed25519 -C "macbook_ai_connect"
+```
+（一路回车即可，会在本地 `~/.ssh/` 下生成 `id_ed25519` 私钥和 `id_ed25519.pub` 公钥）
+
+**第 2 步：将公钥一键上传到云服务器**
+使用系统自带的 `ssh-copy-id` 命令：
+```bash
+ssh-copy-id -i ~/.ssh/id_ed25519.pub ubuntu@你的服务器公网IP
+```
+（输入最后一次服务器原本的账号密码，该命令会自动将公钥写入服务器端的 `~/.ssh/authorized_keys` 文件中）
+
+**第 3 步：服务器端安全权限护栏校验**
+SSH 协议对文件权限有着极度严格的铁律。如果权限设置过宽，SSH 服务端出于安全考虑会直接拒绝免密登录：
+在云服务器端确保以下权限设置正确：
+```bash
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+```
+在 macOS 本地端确保私钥权限安全：
+```bash
+chmod 600 ~/.ssh/id_ed25519
+```
+
+完成上述配置后，本地无论是执行 `./connect.sh`、`ssh ai` 还是 `ai` 别名，都不会再提示任何密码输入，毫秒级直接连入云端终端，即开即用！
