@@ -19,11 +19,48 @@
 
 ### 1. 脚本原理与极简设计
 
-文件 [`start_kitty.sh`](./start_kitty.sh) 仅约 20 行，砍去了冗长的跨平台容错，只保留最核心的工业逻辑：
-1. **自动清理残留 Socket**：防止异常断电造成的死锁；
+文件 [`start_kitty.sh`](./start_kitty.sh) 全长仅 26 行，兼顾了极致精简与高安全容错：
+1. **自动清理残留 Socket**：探测活跃实例防重复启动，清理异常断电死锁；
 2. **IPC 控制门**：通过 Kitty `-o allow_remote_control=yes --listen-on=unix:...` 开放标准化遥控接口；
 3. **会话持久化**：在 Kitty 内部运行 `tmux new-session -A -s workspace`，断网不断会话；
 4. **无头服务器渲染**：在无显示器的 Linux 云端，自动调用 `xvfb-run` 创建虚拟帧缓冲（Framebuffer），完美解决 PTY 渲染问题。
+
+#### 完整脚本源码 (`start_kitty.sh`)
+
+```bash
+#!/bin/bash
+# ==============================================================================
+# 极简版 Kitty + tmux 终端守护启动脚本 (专栏《打造属于你自己的智能体 Harness》第 4 讲配套)
+# 作用：启动带 IPC 远程控制的 Kitty 终端，内置 tmux workspace 会话，实现终端 AI 的稳定复用
+# 特性：支持 systemd 开机自启、实例防重检测、失效死 Socket 自愈清理、无头服务器虚拟渲染
+# ==============================================================================
+set -e
+
+SOCK_PATH="${HOME}/.kitty.sock"
+SOCK="unix:${SOCK_PATH}"
+SESSION_NAME="${KITTY_TMUX_SESSION:-workspace}"
+
+# 1. 活跃检测与防冲突：若已有活跃实例在运行，直接提示并安全退出
+if [ -S "$SOCK_PATH" ] || [ -e "$SOCK_PATH" ]; then
+    if kitten @ --to "$SOCK" ls >/dev/null 2>&1; then
+        echo "✅ Kitty 实例已在后台运行中 (Socket: $SOCK_PATH)，无需重复启动。"
+        echo "💡 直接执行接入：tmux attach -t $SESSION_NAME"
+        exit 0
+    fi
+    # 若是宕机或异常断电留下的失效死 Socket，自动清理
+    echo "⚠️ 检测到残留的失效 socket，正在清理: $SOCK_PATH"
+    rm -f "$SOCK_PATH"
+fi
+
+echo "🚀 正在启动 Kitty 终端 (IPC: $SOCK, tmux: $SESSION_NAME)..."
+
+# 2. 核心启动：无桌面 Linux 环境借助 xvfb-run 提供虚拟帧缓冲；本地桌面直接启动
+if [ -z "$DISPLAY" ] && command -v xvfb-run >/dev/null 2>&1; then
+    exec xvfb-run -a -s "-screen 0 1024x768x24" kitty -o allow_remote_control=yes --listen-on="$SOCK" tmux new-session -A -s "$SESSION_NAME"
+else
+    exec kitty -o allow_remote_control=yes --listen-on="$SOCK" tmux new-session -A -s "$SESSION_NAME"
+fi
+```
 
 ### 2. 快速启动
 
@@ -222,3 +259,24 @@ chmod 600 ~/.ssh/id_ed25519
 ```
 
 完成上述配置后，本地无论是执行 `./connect.sh`、`ssh ai` 还是 `ai` 别名，都不会再提示任何密码输入，毫秒级直接连入云端终端，即开即用！
+
+#### (3) 借助 Workbuddy 等本地 AI 智能体一键完成（一句提示语）
+
+如果你的 macOS 个人电脑中安装了类似 **Workbuddy**（或同类具备本地终端执行能力的现代 AI 智能体），你甚至连上面这一串命令都无需手动输入。
+
+你只需要直接对 Workbuddy 说一句大白话提示语：
+
+> **“帮我生成 ed25519 密钥，把公钥配置到远程服务器 123.45.67.89 实现免密登录，并在本地建一个连入 tmux workspace 的一键直连脚本。”**
+
+Workbuddy 就会全自动在后台帮你生成本地密钥对、将公钥写入服务器端 `authorized_keys`、校验权限，并创建可执行的连接脚本。
+
+#### (4) 核心架构哲学：必须先知道“服务器上的 SSH 是用完即销毁的”
+
+尽管本地 AI 工具能够秒级执行上述指令，但**工具永远不会替你构思顶层设计**。要想完成上述这一整套工作流，**创作者必须首先具备这套架构认知，并且深刻理解“服务器上的 SSH 会话是用完就销毁的透明管道”这一核心道理：**
+
+1. **新手的致命误区**：很多初学者以为 SSH 连接必须时刻保持、电脑不能合盖，误把任务直接挂在 SSH 窗口里。一旦遇到 WiFi 抖动或断网，终端掉线导致任务中止，就会陷入无尽的焦虑中；
+2. **老手的架构真相**：
+   * **SSH 是临时耗材**：SSH 连接不过是一根即插即用、用完即毁的透明传导电缆。敲一行连接，干完按 `Ctrl+B, D` 随时销毁断开，不浪费任何本地与网络资源；
+   * **Kitty + tmux 是常驻母体**：真正承载业务执行状态与长久记忆的，是服务器端通过 `xvfb-run` + Kitty Socket + `tmux workspace` 焊死在 Linux 系统底层的常驻中枢。
+
+**正因为你心里预先知道了这套“端云分离、SSH 即连即毁、tmux 常驻保活”的完整方案，你才能下出那句精准的 Workbuddy 提示语，把现代 AI 工具的效能发挥到极致。**
