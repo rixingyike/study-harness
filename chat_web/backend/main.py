@@ -2,6 +2,8 @@ import os
 import json
 import sqlite3
 import uuid
+import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -44,6 +46,7 @@ class SessionItem(SQLModel, table=True):
     title: str = Field(default="新建对话")
     created_at: str
     updated_at: str
+    conversation_id: Optional[str] = Field(default=None)  # 绑定的终端 CLI 会话 ID
 
 class MessageItem(SQLModel, table=True):
     __tablename__ = "messages"
@@ -74,6 +77,11 @@ def get_db():
 def init_db():
     # 核心：自动扫描所有 table=True 的模型；已存在则自动跳过，绝不重复建表或覆盖历史数据
     SQLModel.metadata.create_all(engine)
+    with get_db() as conn:
+        cols = [c[1] for c in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+        if "conversation_id" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN conversation_id TEXT")
+            conn.commit()
 
 init_db()
 
@@ -141,10 +149,97 @@ TOOLS_SCHEMA = [
     }
 ]
 
-# ----------------- 核心状态机循环引擎 (Think -> Act -> Observe) -----------------
-def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns: int = 5) -> tuple[str, str]:
+# ----------------- 终端 AI CLI 与状态机循环引擎 -----------------
+def get_terminal_cli_path() -> Optional[str]:
+    """定位本地终端 AI CLI 执行文件（优先使用官方 Google Antigravity/Gemini agy）"""
+    candidates = [
+        shutil.which("agy"),
+        os.path.expanduser("~/.local/bin/agy"),
+        "/home/ubuntu/.local/bin/agy",
+        "/usr/local/bin/agy",
+        "/usr/bin/agy"
+    ]
+    for p in candidates:
+        if p and os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+def run_terminal_ai_engine(
+    user_prompt: str,
+    session_id: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+    timeout: int = 120
+) -> tuple[str, str, Optional[str]]:
     """
-    驱动 Think -> Act -> Observe 状态机循环，一边推演一边收集思考日志供前端折叠展示
+    【向终端发送请求】调用本地终端 AI CLI (agy / Google Gemini)
+    通过命令行参数与 JSON 结构化流进行进程通讯，复用已授权账号额度与工具链，零 API 计费直接驱动
+    """
+    agy_bin = get_terminal_cli_path()
+    if not agy_bin:
+        raise RuntimeError("未检测到本地终端 AI CLI (agy)")
+
+    cmd = [agy_bin, "-p", user_prompt, "--output-format", "json", "--dangerously-skip-permissions"]
+    if conversation_id:
+        cmd.extend(["--conversation", conversation_id])
+
+    try:
+        res = subprocess.run(cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        thinking_text = (
+            f"--- 【终端 AI CLI 调度 Think】向本地终端发送请求 (Google Gemini via agy) ---\n"
+            f"【会话绑定 Session】Web 会话: {session_id or '未绑定'} | 终端会话: {conversation_id or '新建'}\n"
+            f"【行动 Act】派发终端指令：agy -p [用户提示词]\n"
+            f"【安全刹车 Stop】终端 AI 执行耗时超过 {timeout} 秒，强制中断退出防死锁。"
+        )
+        return thinking_text, "终端执行超时，请稍后重试。", conversation_id
+    except Exception as e:
+        thinking_text = f"【终端调用异常】向终端发送请求失败: {str(e)}"
+        return thinking_text, f"终端调用失败: {str(e)}", conversation_id
+
+    if res.returncode != 0:
+        err_msg = res.stderr.strip() or res.stdout.strip() or f"退出码: {res.returncode}"
+        thinking_text = (
+            f"--- 【终端 AI CLI 调度 Think】向本地终端发送请求 (Google Gemini via agy) ---\n"
+            f"【报错 Observe】终端返回非零退出码 ({res.returncode})：\n{err_msg}"
+        )
+        return thinking_text, "终端执行异常，请检查本地环境。", conversation_id
+
+    try:
+        data = json.loads(res.stdout)
+        final_reply = data.get("response", "").strip() or "（终端任务已执行完毕）"
+        new_conv_id = data.get("conversation_id") or conversation_id
+        duration = data.get("duration_seconds", 0)
+        num_turns = data.get("num_turns", 1)
+        status = data.get("status", "SUCCESS")
+        usage = data.get("usage", {})
+
+        in_tok = usage.get("input_tokens", 0)
+        out_tok = usage.get("output_tokens", 0)
+        think_tok = usage.get("thinking_tokens", 0)
+        tot_tok = usage.get("total_tokens", 0)
+
+        thinking_logs = [
+            f"--- 【终端 AI CLI 调度 Think】向本地终端发送请求 (Google Gemini via agy CLI) ---",
+            f"【会话绑定 Session】Web 会话: {session_id or '未绑定'} | 终端会话: {new_conv_id or '新建'}",
+            f"【行动 Act】派发终端指令：agy -p [用户提示词] {'--conversation ' + conversation_id if conversation_id else ''}",
+            f"【观察 Observe】终端 AI 推演完成 (执行耗时: {duration:.2f}s, 轮数: {num_turns})",
+            f"【资源消耗 Token Usage】输入 Token: {in_tok:,} | 输出 Token: {out_tok:,} (其中深度思考: {think_tok:,}) | 总计: {tot_tok:,} | 状态: {status}",
+            f"【底层机制 Note】全流程复用本地终端常驻会话与 Google 账号额度，零额外 API 接口计费。"
+        ]
+
+        return "\n\n".join(thinking_logs), final_reply, new_conv_id
+    except Exception as e:
+        raw_out = res.stdout.strip()
+        thinking_text = f"【解析推演】终端返回原始输出，已直接承接：\n{raw_out[:300]}..."
+        return thinking_text, raw_out or "（终端任务已完成）", conversation_id
+
+def run_deepseek_api_engine(
+    history_messages: List[dict],
+    user_prompt: str,
+    max_turns: int = 5
+) -> tuple[str, str]:
+    """
+    备用引擎：驱动原有 DeepSeek HTTP API 思考-行动-观察循环
     """
     api_key, base_url = load_deepseek_env()
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -212,6 +307,32 @@ def run_harness_engine(history_messages: List[dict], user_prompt: str, max_turns
 
     return "\n\n".join(thinking_logs), final_content
 
+def run_harness_engine(
+    history_messages: List[dict],
+    user_prompt: str,
+    session_id: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+    max_turns: int = 5
+) -> tuple[str, str, Optional[str]]:
+    """
+    核心调度引擎：
+    优先向本地终端发送请求（调用 agy CLI 复用终端 AI 与工具）；
+    若未检测到本地终端 CLI，自动平滑降级为 DeepSeek HTTP API 循环。
+    """
+    terminal_cli = get_terminal_cli_path()
+    if terminal_cli:
+        try:
+            return run_terminal_ai_engine(
+                user_prompt,
+                session_id=session_id,
+                conversation_id=conversation_id
+            )
+        except Exception as e:
+            print(f"[Warn] 终端 AI 调用失败，自动降级为 API 引擎: {e}")
+
+    thinking_logs, final_reply = run_deepseek_api_engine(history_messages, user_prompt, max_turns=max_turns)
+    return thinking_logs, final_reply, conversation_id
+
 # ----------------- FastAPI 应用与路由 -----------------
 app = FastAPI(title="Study-Harness AI Web 控制台", version="2.0.0")
 
@@ -232,7 +353,8 @@ def list_sessions():
                 id=r["id"],
                 title=r["title"],
                 created_at=r["created_at"],
-                updated_at=r["updated_at"]
+                updated_at=r["updated_at"],
+                conversation_id=r["conversation_id"] if "conversation_id" in r.keys() else None
             )
             for r in rows
         ]
@@ -243,11 +365,11 @@ def create_session(req: CreateSessionRequest):
     now_str = datetime.now().isoformat()
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            (session_id, req.title or "新建对话", now_str, now_str)
+            "INSERT INTO sessions (id, title, created_at, updated_at, conversation_id) VALUES (?, ?, ?, ?, ?)",
+            (session_id, req.title or "新建对话", now_str, now_str, None)
         )
         conn.commit()
-    return SessionItem(id=session_id, title=req.title or "新建对话", created_at=now_str, updated_at=now_str)
+    return SessionItem(id=session_id, title=req.title or "新建对话", created_at=now_str, updated_at=now_str, conversation_id=None)
 
 @app.delete("/api/sessions/{session_id}")
 def delete_session(session_id: str):
@@ -289,6 +411,8 @@ def send_message(session_id: str, req: SendMessageRequest):
         if not sess:
             raise HTTPException(status_code=404, detail="会话不存在")
 
+        existing_conv_id = sess["conversation_id"] if "conversation_id" in sess.keys() else None
+
         # 首问截取会话标题
         msg_count = conn.execute(
             "SELECT COUNT(*) as cnt FROM messages WHERE session_id = ?",
@@ -322,10 +446,12 @@ def send_message(session_id: str, req: SendMessageRequest):
         ).fetchall()
         history_list = [{"role": r["role"], "content": r["content"]} for r in history_rows]
 
-    # 直接调用内聚的状态机循环引擎
-    thinking_process, final_reply = run_harness_engine(history_list, req.content)
+    # 直接调用状态机引擎（向终端发送请求，复用终端 CLI AI）
+    thinking_process, final_reply, new_conv_id = run_harness_engine(
+        history_list, req.content, session_id=session_id, conversation_id=existing_conv_id
+    )
 
-    # 存入助手回复与思考日志
+    # 存入助手回复与思考日志，并更新会话绑定的终端 conversation_id
     assistant_msg_id = str(uuid.uuid4())
     assistant_now_str = datetime.now().isoformat()
     with get_db() as conn:
@@ -333,10 +459,16 @@ def send_message(session_id: str, req: SendMessageRequest):
             "INSERT INTO messages (id, session_id, role, content, thinking, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (assistant_msg_id, session_id, "assistant", final_reply, thinking_process, assistant_now_str)
         )
-        conn.execute(
-            "UPDATE sessions SET updated_at = ? WHERE id = ?",
-            (assistant_now_str, session_id)
-        )
+        if new_conv_id and new_conv_id != existing_conv_id:
+            conn.execute(
+                "UPDATE sessions SET updated_at = ?, conversation_id = ? WHERE id = ?",
+                (assistant_now_str, new_conv_id, session_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE sessions SET updated_at = ? WHERE id = ?",
+                (assistant_now_str, session_id)
+            )
         conn.commit()
 
     return MessageItem(

@@ -280,3 +280,27 @@ Workbuddy 就会全自动在后台帮你生成本地密钥对、将公钥写入�
    * **Kitty + tmux 是常驻母体**：真正承载业务执行状态与长久记忆的，是服务器端通过 `xvfb-run` + Kitty Socket + `tmux workspace` 焊死在 Linux 系统底层的常驻中枢。
 
 **正因为你心里预先知道了这套“端云分离、SSH 即连即毁、tmux 常驻保活”的完整方案，你才能下出那句精准的 Workbuddy 提示语，把现代 AI 工具的效能发挥到极致。**
+
+---
+
+### 8. Web 控制台升级：核心循环全面接入终端 AI (agy CLI)
+
+在之前的版本中，Web 框架的状态机循环（Think-Act-Observe）是通过 HTTP 请求直接调用 DeepSeek 接口实现的。
+
+而在第 04 讲中，我们完成了核心循环的升级：**将原先向外部 HTTP API 接口发送请求，全面改造为向本地终端 AI CLI（Google Gemini 驱动的 `agy`）发送请求**。
+
+#### (1) 改造核心点 (`chat_web/backend/main.py`)
+1. **指令派发与流控**：
+   通过 Python 的 `subprocess.run`，以命令行参数及结构化 JSON 格式直接与 `agy` CLI 交互：
+   ```bash
+   agy -p "用户输入内容" --output-format json --dangerously-skip-permissions [--conversation <conv_id>]
+   ```
+2. **多轮对话状态持久化**：
+   在 SQLite 数据库的 `sessions` 表中新增 `conversation_id` 字段。每次从终端 AI 返回持久化会话 ID 后自动绑定，实现 Web 页面上的多轮对话与终端 CLI 的上下文无缝同步；
+3. **推演与思考日志呈现**：
+   将终端 CLI 返回的真实思考推演（`thinking_tokens`）、耗时及 Token 消耗完整格式化为推演日志，直观呈现在 Web 前端的灰色折叠卡片中；
+4. **双轨平滑降级（无缝兼容）**：
+   自动探测本地终端是否具备 `agy` 命令。若检测到则优先走极速免费的终端 AI 线路；若未检测到终端环境，自动无感降级为原有的 DeepSeek HTTP API 循环，确保读者无论在什么环境下都能开箱即用。
+
+#### (2) 线上运行验证 (Systemd 托管)
+修改后的代码已全面部署于服务端的 `app-sh.service`，监听 `PORT=3010`（线上域名 `sh.yishulun.com`）。Web 界面输入消息后，直接由本地常驻的终端 AI 完成推理并极速返回。
