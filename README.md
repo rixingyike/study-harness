@@ -9,7 +9,7 @@
 * **第 01 讲**：大模型 API 底层通信与前缀缓存（Prompt Caching）极简原理
 * **第 02 讲**：Think-Act-Observe 思考-行动-观察三元核心回路
 * **第 03 讲**：[`chat_web/`](./chat_web) - 现代多轮对话交互控制台（FastAPI + Vue3 + SQLite 历史会话持久化）
-* **第 04 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）与 [`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）
+* **第 04 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）、[`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）、[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）与 [`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）
 
 ---
 
@@ -342,3 +342,86 @@ Workbuddy 就会全自动在后台帮你生成本地密钥对、将公钥写入�
   * **Anthropic Claude Code (`claude`)**：`claude -p "提示语" --output-format json [--resume <id>]`
   * **Aider (`aider`)**：`aider --message "提示语" --yes`
   本套 Harness 架构天生具备**模型中立性**，只需调整底层的一两行命令行参数映射，即可把全世界各大厂商的顶级终端 AI 自由插拔、无缝复用！
+
+---
+
+### 9. 进阶实战：换成终端 AI 后，原有的自定义 Python 工具函数去哪了？（方案 A MCP 协议与方案 B 独立脚本工具）
+
+#### (1) 为什么原来代码里的 `TOOL_MAP` 没被触发？
+
+在第 02/03 讲手搓核心循环时，我们通过字典形式定义了本地工具：
+```python
+TOOL_MAP = {
+    "read_file": read_file,
+    "calculate_token_cost": calculate_token_cost
+}
+```
+当大模型（如 DeepSeek HTTP 接口）返回带有 `tool_calls` 的 JSON 时，我们的 Python 宿主循环拦截该请求并执行本地函数。
+
+而到了第 04 讲，当我们把核心循环换成调用终端 AI（`agy -p` 或 `claude -p`）时：
+* **裸 API（如 DeepSeek/OpenAI HTTP）**：相当于“有大脑没手脚”。模型本身只返回一段文本/JSON 表示“我想调用某个函数”，手脚完全靠我们手搓的 Python 宿主循环驱动；
+* **终端 AI（如 agy / Claude Code）**：相当于“全副武装的特种兵”，它们本身就是一套完整的智能体 Harness。官方在内部打磨了极其严密的系统级工具链（文件读写、Bash 执行、Git 差异比对、全库搜索）。通过 `agy -p` 调用时，它在独立的进程沙箱中运行原生系统工具，自然不再经过 Python 宿主中的内存字典。
+
+#### (2) 如何让终端 AI 调用我们自定义的专属业务函数？
+
+现代工业界针对终端智能体提供了两条标准扩展路线。本仓库对这两种方案均已提供完整可运行的代码实现：
+
+##### 方案 A：基于标准 MCP (Model Context Protocol) 协议拓展
+* **源码实现**：[`mcp_server.py`](./mcp_server.py)
+* **核心原理**：MCP 是 Anthropic 主导、各大厂商普遍支持的智能体上下文标准协议。通过标准 `stdio`（标准输入输出）进程间通信，将本地 Python 函数作为 JSON-RPC 工具暴露给外部智能体。
+* **业务工具定义**：
+  * `get_study_harness_summary()`: 读取 `chat_web/backend/chat.db` 统计当前系统运行状态、会话总数与消息总量；
+  * `calculate_token_cost(model_name, input_tokens, output_tokens)`: 计算不同模型调用的成本折算与省钱策略。
+* **一键注册到终端 AI (以 agy 为例)**：
+  ```bash
+  agy mcp add study-tools $(which python3) $(pwd)/mcp_server.py
+  ```
+  查看注册状态：
+  ```bash
+  agy mcp list
+  # 输出:
+  # NAME         TYPE   STATUS   COMMAND/URL
+  # study-tools  stdio  enabled  /path/to/python3 /path/to/mcp_server.py
+  ```
+* **终端 AI 调用实测**：
+  ```bash
+  agy -p "请调用 study-tools 里的 calculate_token_cost 工具计算 deepseek 输入 10000 tokens 输出 2000 tokens 的成本" --dangerously-skip-permissions
+  ```
+  **实测输出结果**：
+  > 【Token 计费核算 - 国产 DeepSeek-V3 API (元/千Tokens)】
+  > - **输入**：10,000 Tokens
+  > - **输出**：2,000 Tokens
+  > - **单次估算成本**：0.0360 RMB
+  > - **建议**：推荐重度开发走包月/终端 CLI 复用路线，日常微调走 DeepSeek 按量路线。
+
+##### 方案 B：独立命令行工具脚本 (Scripting & CLI / Skill 工具化)
+* **源码实现**：[`scripts/harness_tools.py`](./scripts/harness_tools.py)
+* **核心原理**：现代终端 AI 最强大、最通用的原生工具就是 **Bash 执行**。我们无需配置任何守护进程和协议框架，直接把业务逻辑写成带命令行参数的独立 Python 脚本。
+* **支持的 CLI 指令**：
+  ```bash
+  # 1. 查看项目数据库与会话统计
+  python3 scripts/harness_tools.py summary
+  
+  # 2. 核算指定模型的 Token 成本
+  python3 scripts/harness_tools.py cost --model claude-pro --input 50000 --output 10000
+  
+  # 3. 探测本地 Web 服务 (port 3010) 健康状态
+  python3 scripts/harness_tools.py status
+  ```
+* **终端 AI 调用实测**：
+  ```bash
+  agy -p "执行本地脚本 python3 scripts/harness_tools.py summary 并用一句话总结会话总数" --dangerously-skip-permissions
+  ```
+  **实测输出结果**：
+  > 执行 scripts/harness_tools.py 的概况统计结果显示，当前数据库中共有 5 个会话。
+
+#### (3) 两种方案的工程选型建议
+
+| 维度 | 方案 A：MCP 协议 (`mcp_server.py`) | 方案 B：CLI 脚本 (`scripts/harness_tools.py`) |
+| :--- | :--- | :--- |
+| **通信机制** | 标准 JSON-RPC (stdio 双向管道) | 操作系统原生 Bash / 命令行调用 |
+| **跨工具通用性** | 需宿主 AI 支持 MCP (agy, Claude Code, Cursor) | **通用于所有具备 Bash 能力的 Agent** (agy, Claude, Aider, Codex, 甚至 Bash/Cron) |
+| **部署与运维成本** | 需安装 `mcp` 依赖库并通过命令注册配置 | **零额外依赖**，纯 Python 标准库，即拷即用 |
+| **调试体验** | 需查看 stdio 握手与错误日志 | 终端直接单步敲命令，输入输出纤毫毕现 |
+| **最适场景** | 复杂结构化对象交互、长连接状态机、跨机器多 Agent 共享 | 业务统计排查、数据库读写、运维脚本调度、日常工具扩展 |
+
