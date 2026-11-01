@@ -67,3 +67,51 @@ tmux attach -t workspace
   ```bash
   kitten @ --to "unix:$HOME/.kitty.sock" get-text --match id:1
   ```
+
+---
+
+### 5. 生产环境开机自启与守护 (Systemd 部署)
+
+在真实服务器生产环境中，该脚本正是通过 Linux 原生 `systemd` 实现了**开机自启动**与**宕机 3 秒自动拉起自愈**。
+
+服务配置文件位于：`/etc/systemd/system/app-kitty-daemon.service`
+
+```ini
+[Unit]
+Description=Kitty Terminal Remote Control Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+Environment="PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/Users/jsmn/workspace/scripts/start_kitty.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 自启与运维管理命令
+
+* **设为开机自启并启动**：
+  ```bash
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now app-kitty-daemon.service
+  ```
+* **查看运行状态**：
+  ```bash
+  systemctl status app-kitty-daemon.service
+  ```
+* **重启服务**：
+  ```bash
+  sudo systemctl restart app-kitty-daemon.service
+  ```
+* **查看运行日志**：
+  ```bash
+  journalctl -u app-kitty-daemon.service -f -n 50
+  ```
+
+有 `systemd` 在底层保驾护航，配合脚本内部的 Socket 活跃防重检测与失效自愈逻辑，无论服务器怎么重启，后台 AI 终端都能够全天候稳定在线。
