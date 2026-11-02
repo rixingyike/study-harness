@@ -31,7 +31,7 @@ python3 scripts/harness_tools.py cost --model <model_name> --input <in_tokens> -
   * `claude-api`：Claude 3.5 Sonnet 官方 API 直连
 
 ### 3. 本地 Web 控制台健康检查
-当用户询问前端控制台（端口 3010 / sh.yishulun.com）是否存活时：
+当用户询问前端控制台（端口 3010）是否存活时：
 ```bash
 python3 scripts/harness_tools.py status
 ```
