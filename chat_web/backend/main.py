@@ -537,6 +537,25 @@ if os.path.exists(FRONTEND_DIST):
             return FileResponse(target)
         return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
 
+def ensure_skills_symlink():
+    """确保 .agents/skills 软链接指向 system/skills，使 Google agy CLI 能感知专有技能包"""
+    agents_dir = PROJECT_ROOT / ".agents"
+    agents_skills = agents_dir / "skills"
+    system_skills = PROJECT_ROOT / "system" / "skills"
+
+    if not system_skills.exists():
+        system_skills.mkdir(parents=True, exist_ok=True)
+    if not agents_dir.exists():
+        agents_dir.mkdir(parents=True, exist_ok=True)
+
+    if not agents_skills.exists() and not agents_skills.is_symlink():
+        try:
+            # 建立相对软链接：.agents/skills -> ../system/skills
+            os.symlink("../system/skills", str(agents_skills))
+            print(" [技能适配] 已创建软链接 .agents/skills -> ../system/skills (适配 Google agy CLI)")
+        except Exception as e:
+            print(f" [技能适配] 创建软链接跳过: {e}")
+
 def ensure_system_mcp_registered():
     """Web 服务启动时自动检测并将项目 system/mcp/ 下的 weather_mcp 注册入终端 AI (agy)"""
     weather_mcp = PROJECT_ROOT / "system" / "mcp" / "weather_mcp.py"
@@ -560,6 +579,7 @@ def ensure_system_mcp_registered():
 
 if __name__ == "__main__":
     import uvicorn
+    ensure_skills_symlink()
     ensure_system_mcp_registered()
     port = int(os.environ.get("PORT", 3010))
     print(f"==================================================")
