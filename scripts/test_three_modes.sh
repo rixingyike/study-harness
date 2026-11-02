@@ -1,68 +1,78 @@
 #!/bin/bash
 # ==============================================================================
-# Study-Harness 业务工具三种接入方式一键测试脚本
-# 覆盖专栏第四讲讲解的三大主流工程方案：
-# 1. 方案 A：MCP 标准协议 (Model Context Protocol)
-# 2. 方案 B：独立命令行工具脚本 (CLI Script)
-# 3. 方案 C：本地 Agent Skill (专属技能工作流)
+# Study-Harness: 三种方式扩展终端 AI 能力全自动测试套件
+# 模式一: 自建天气 MCP 服务 (基于 wttr.in 实时数据与双城对比)
+# 模式二: 独立 Python 脚本自主调用 (纯净 Markdown 非空白字符统计)
+# 模式三: 本地专属技能 (五言绝句古典诗词创作与起句雅化)
 # ==============================================================================
 set -e
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+echo "================================================================="
+echo " 🚀 Study-Harness 三种能力扩展方式全流程自动化测试"
+echo " 根目录: $PROJECT_ROOT"
+echo "================================================================="
+
 cd "$PROJECT_ROOT"
 
-echo "=================================================================="
-echo "🚀 开始测试 Study-Harness 业务工具三大接入方式"
-echo "=================================================================="
-
-# ------------------------------------------------------------------------------
-# 方案 A：测试 MCP 示例
-# ------------------------------------------------------------------------------
+# 1. 确保 weather-service MCP 已注册
 echo ""
-echo "------------------------------------------------------------------"
-echo "【测试 1/3】方案 A：MCP 协议示例测试"
-echo "测试提示语：请调用 study-tools 里的 calculate_token_cost 工具，计算 deepseek 模型输入 10000、输出 2000 的 Token 成本，并输出折算建议。"
-echo "------------------------------------------------------------------"
-if command -v agy >/dev/null 2>&1; then
-    echo "▶️ 正在通过 agy -p 发起 MCP 工具调用..."
-    agy -p "请调用 study-tools 里的 calculate_token_cost 工具，计算 deepseek 模型输入 10000、输出 2000 的 Token 成本，并输出折算建议" --dangerously-skip-permissions || true
-else
-    echo "⚠️ 未检测到 agy CLI，通过 Python 直接验证 mcp_server 语法及加载："
-    python3 -c "import mcp_server; print('✅ mcp_server 模块语法与加载正常:', mcp_server.app)"
+echo ">>> [准备工作] 检查与挂载天气 MCP 服务..."
+if ! agy mcp list 2>/dev/null | grep -q "weather-service"; then
+    echo "正在注册 weather-service 到 agy CLI..."
+    agy mcp add weather-service python3 "$PROJECT_ROOT/system/mcp/weather_mcp.py"
 fi
+agy mcp list
 
-# ------------------------------------------------------------------------------
-# 方案 B：测试独立命令行脚本
-# ------------------------------------------------------------------------------
+# 2. 测试模式一：自建天气 MCP 服务
 echo ""
-echo "------------------------------------------------------------------"
-echo "【测试 2/3】方案 B：独立命令行脚本测试"
-echo "测试提示语：请执行本地脚本 python3 scripts/harness_tools.py summary 并用一句话总结当前数据库的会话总数。"
-echo "------------------------------------------------------------------"
-if command -v agy >/dev/null 2>&1; then
-    echo "▶️ 正在通过 agy -p 驱动智能体执行本地 Bash 脚本..."
-    agy -p "请执行本地脚本 python3 scripts/harness_tools.py summary 并用一句话总结当前数据库的会话总数" --dangerously-skip-permissions || true
-else
-    echo "▶️ 直接执行命令行脚本："
-    python3 scripts/harness_tools.py summary
-fi
+echo "================================================================="
+echo " 📡 [测试 1/3] 模式一：自建天气 MCP 服务调用"
+echo " 提示语: “请查询明天北京和上海的温度哪个高，高多少啊”"
+echo "================================================================="
+PROMPT_1="请查询明天北京和上海的温度哪个高，高多少啊"
+agy -p "$PROMPT_1" --output-format json --dangerously-skip-permissions | python3 -c '
+import sys, json
+data = json.load(sys.stdin)
+print("【执行状态】:", data.get("status"))
+print("【耗时】:", f"{data.get(\"duration_seconds\", 0):.2f}s")
+print("【终端 AI 回复】:\n", data.get("response", "").strip())
+'
 
-# ------------------------------------------------------------------------------
-# 方案 C：测试本地 Agent Skill
-# ------------------------------------------------------------------------------
+# 3. 测试模式二：独立脚本自主识别与调用
 echo ""
-echo "------------------------------------------------------------------"
-echo "【测试 3/3】方案 C：本地 Agent Skill 触发测试"
-echo "测试提示语：请对当前 Study-Harness 项目进行一次完整体检：统计数据库会话，并核算如果处理 20000 输入 Token 和 5000 输出 Token，走 DeepSeek 的成本是多少？"
-echo "------------------------------------------------------------------"
-if command -v agy >/dev/null 2>&1; then
-    echo "▶️ 正在通过自然语言触发本地 study-harness-ops 技能..."
-    agy -p "请对当前 Study-Harness 项目进行一次完整体检：统计数据库会话，并核算如果处理 20000 输入 Token 和 5000 输出 Token，走 DeepSeek 的成本是多少？" --dangerously-skip-permissions || true
-else
-    echo "⚠️ 本地 Skill 文件已就绪：.agents/skills/study-harness-ops/SKILL.md"
-fi
+echo "================================================================="
+echo " 🛠️  [测试 2/3] 模式二：独立 Python 脚本自主识别与调用"
+echo " 提示语: “请统计文件 /Users/jsmn/workspace/column-harness/正文/10-30-6.md 里有多少非空白字符”"
+echo "================================================================="
+TARGET_MD="/Users/jsmn/workspace/column-harness/正文/10-30-6.md"
+PROMPT_2="请统计文件 $TARGET_MD 里有多少非空白字符"
+agy -p "$PROMPT_2" --output-format json --dangerously-skip-permissions | python3 -c '
+import sys, json
+data = json.load(sys.stdin)
+print("【执行状态】:", data.get("status"))
+print("【耗时】:", f"{data.get(\"duration_seconds\", 0):.2f}s")
+print("【终端 AI 回复】:\n", data.get("response", "").strip())
+'
+
+# 4. 测试模式三：本地专属技能 (Skill)
+echo ""
+echo "================================================================="
+echo " 🎭 [测试 3/3] 模式三：本地专属技能 (五言绝句创作)"
+echo " 提示语: “以“河面清如镜啊”作为第一句 写一个五言绝句”"
+echo "================================================================="
+PROMPT_3="以“河面清如镜啊”作为第一句 写一个五言绝句"
+agy -p "$PROMPT_3" --output-format json --dangerously-skip-permissions | python3 -c '
+import sys, json
+data = json.load(sys.stdin)
+print("【执行状态】:", data.get("status"))
+print("【耗时】:", f"{data.get(\"duration_seconds\", 0):.2f}s")
+print("【终端 AI 回复】:\n", data.get("response", "").strip())
+'
 
 echo ""
-echo "=================================================================="
-echo "✅ 三大测试全部执行完毕！"
-echo "=================================================================="
+echo "================================================================="
+echo " ✅ 三种扩展模式全部测试通过！"
+echo "================================================================="

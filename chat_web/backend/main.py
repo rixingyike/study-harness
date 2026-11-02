@@ -117,6 +117,15 @@ TOOL_MAP = {
     "write_file": write_file
 }
 
+# 引入项目 system/mcp/ 目录下的天气扩展服务（实现双轨兼容与 Web 注册）
+try:
+    sys.path.insert(0, str(PROJECT_ROOT / "system" / "mcp"))
+    from weather_mcp import get_weather, compare_weather
+    TOOL_MAP["get_weather"] = get_weather
+    TOOL_MAP["compare_weather"] = compare_weather
+except Exception:
+    pass
+
 TOOLS_SCHEMA = [
     {
         "type": "function",
@@ -144,6 +153,37 @@ TOOLS_SCHEMA = [
                     "content": {"type": "string", "description": "要写入的纯文本内容"}
                 },
                 "required": ["file_path", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "基于 wttr.in 查询指定城市的天气预报（支持今天或明天）",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "城市名称，如 '北京'、'上海'"},
+                    "day": {"type": "string", "description": "预报日期，可选 'today' 或 'tomorrow'"}
+                },
+                "required": ["city"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_weather",
+            "description": "对比两个城市在指定日期（如明天）的温度高低及温差",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city1": {"type": "string", "description": "第一个城市名称，如 '北京'"},
+                    "city2": {"type": "string", "description": "第二个城市名称，如 '上海'"},
+                    "day": {"type": "string", "description": "预报日期，默认 'tomorrow'"}
+                },
+                "required": ["city1", "city2"]
             }
         }
     }
@@ -497,8 +537,30 @@ if os.path.exists(FRONTEND_DIST):
             return FileResponse(target)
         return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
 
+def ensure_system_mcp_registered():
+    """Web 服务启动时自动检测并将项目 system/mcp/ 下的 weather_mcp 注册入终端 AI (agy)"""
+    weather_mcp = PROJECT_ROOT / "system" / "mcp" / "weather_mcp.py"
+    if not weather_mcp.exists():
+        return
+    agy_bin = get_terminal_cli_path()
+    if not agy_bin:
+        return
+    try:
+        check = subprocess.run([agy_bin, "mcp", "list"], capture_output=True, text=True, timeout=5)
+        if "weather-service" not in check.stdout:
+            subprocess.run(
+                [agy_bin, "mcp", "add", "weather-service", "python3", str(weather_mcp)],
+                capture_output=True, text=True, timeout=5
+            )
+            print(" [MCP 自动注册] 已将天气服务 (weather-service) 挂载至终端 AI 扩展槽。")
+        else:
+            print(" [MCP 服务就绪] weather-service (天气预报与对比) 处于激活状态。")
+    except Exception as e:
+        print(f" [MCP 状态检查] 跳过自动注册: {e}")
+
 if __name__ == "__main__":
     import uvicorn
+    ensure_system_mcp_registered()
     port = int(os.environ.get("PORT", 3010))
     print(f"==================================================")
     print(f" Study-Harness AI 控制台启动中...")

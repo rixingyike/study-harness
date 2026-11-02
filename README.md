@@ -365,7 +365,7 @@ python3 backend/main.py
 ```python
 TOOL_MAP = {
     "read_file": read_file,
-    "calculate_token_cost": calculate_token_cost
+    "write_file": write_file
 }
 ```
 当大模型（如 DeepSeek HTTP 接口）返回带有 `tool_calls` 的 JSON 时，我们的 Python 宿主循环拦截该请求并执行本地函数。
@@ -374,61 +374,74 @@ TOOL_MAP = {
 * **裸 API（如 DeepSeek/OpenAI HTTP）**：相当于“有大脑没手脚”。模型本身只返回一段文本/JSON 表示“我想调用某个函数”，手脚完全靠我们手搓的 Python 宿主循环驱动；
 * **终端 AI（如 agy / Claude Code）**：相当于“全副武装的特种兵”，它们本身就是一套完整的智能体 Harness。官方在内部打磨了极其严密的系统级工具链（文件读写、Bash 执行、Git 差异比对、全库搜索）。通过 `agy -p` 调用时，它在独立的进程沙箱中运行原生系统工具，自然不再经过 Python 宿主中的内存字典。
 
-#### (2) 三大主流工程扩展方案实战与测试提示语设计
+#### (2) 项目扩展架构体系：`system/` 目录组织
 
-现代工业界针对终端智能体提供了三条层次分明的工具扩展与意图挂载方案。本仓库对这三种方案均已提供完整可运行的代码实现与自动化测试：
+为了让业务扩展结构清晰、职责分离，本项目在根目录下统一建立 `system/` 目录，分为三大子模块：
+* **`system/mcp/`**：存放符合 MCP (Model Context Protocol) 标准规范的独立微服务；
+* **`system/scripts/`**：存放高内聚、零依赖的 Python 命令行脚本工具；
+* **`system/skills/`**：存放遵循 Agent Skills 规范的专属业务技能与 SOP。
 
-##### 方案 A：基于标准 MCP (Model Context Protocol) 协议拓展
-* **源码实现**：[`mcp_server.py`](./mcp_server.py)
-* **核心原理**：MCP 是 Anthropic 主导、各大厂商普遍支持的智能体上下文标准协议。通过标准 `stdio`（标准输入输出）进程间通信，将本地 Python 函数作为 JSON-RPC 工具暴露给外部智能体。
-* **业务工具定义**：
-  * `get_study_harness_summary()`: 读取 `chat_web/backend/chat.db` 统计当前系统运行状态、会话总数与消息总量；
-  * `calculate_token_cost(model_name, input_tokens, output_tokens)`: 计算不同模型调用的成本折算与省钱策略。
-* **一键注册到终端 AI (以 agy 为例)**：
-  ```bash
-  agy mcp add study-tools $(which python3) $(pwd)/mcp_server.py
-  ```
+#### (3) 三大主流工程扩展方案实战与测试提示语设计
+
+##### 方案 A：自建天气 MCP (Model Context Protocol) 微服务
+* **源码实现**：[`system/mcp/weather_mcp.py`](./system/mcp/weather_mcp.py)
+* **核心原理**：数据源直连 `wttr.in` 开放天气服务（如 `curl "wttr.in/Shanghai?1"` 或 JSON 接口 `wttr.in/Shanghai?format=j1`），零 API Key 依赖。将其封装为标准 MCP 工具服务：`get_weather` 与 `compare_weather`。
+* **在 Web 程序中注册与调用**：
+  * **自动注册**：[`chat_web/backend/main.py`](./chat_web/backend/main.py) 在启动时自动检测并调用 `agy mcp add weather-service python3 system/mcp/weather_mcp.py` 挂载到终端 AI；同时在后端备用引擎的 `TOOL_MAP` 中内置支持，确保双轨平滑运行。
 * **专属测试提示语 1**：
-  > “请调用 study-tools 里的 calculate_token_cost 工具，计算 deepseek 模型输入 10000、输出 2000 的 Token 成本，并输出折算建议。”
+  > “请查询明天北京和上海的温度哪个高，高多少啊”
 * **终端 AI 真实调用输出**：
-  > 【Token 计费核算 - 国产 DeepSeek-V3 API (元/千Tokens)】
-  > - **输入**：10,000 Tokens
-  > - **输出**：2,000 Tokens
-  > - **单次估算成本**：0.0360 RMB
-  > - **建议**：推荐重度开发走包月/终端 CLI 复用路线，日常微调走 DeepSeek 按量路线。
-
-##### 方案 B：独立命令行工具脚本 (Scripting & CLI 工具化)
-* **源码实现**：[`scripts/harness_tools.py`](./scripts/harness_tools.py)
-* **核心原理**：现代终端 AI 最强大、最通用的原生工具就是 **Bash 执行**。我们无需配置任何守护进程和协议框架，直接把业务逻辑写成带命令行参数的独立 Python 脚本。
-* **支持的 CLI 指令**：
-  ```bash
-  # 1. 查看项目数据库与会话统计
-  python3 scripts/harness_tools.py summary
-  
-  # 2. 核算指定模型的 Token 成本
-  python3 scripts/harness_tools.py cost --model claude-pro --input 50000 --output 10000
-  
-  # 3. 探测本地 Web 服务 (port 3010) 健康状态
-  python3 scripts/harness_tools.py status
-  ```
-* **专属测试提示语 2**：
-  > “请执行本地脚本 python3 scripts/harness_tools.py summary 并用一句话总结当前数据库的会话总数。”
-* **终端 AI 真实调用输出**：
-  > 执行 scripts/harness_tools.py 的概况统计结果显示，当前数据库中共有 5 个会话。
-
-##### 方案 C：本地专属技能 (Agent Skill / 渐进式披露)
-* **源码实现**：[`.agents/skills/study-harness-ops/SKILL.md`](./.agents/skills/study-harness-ops/SKILL.md)
-* **核心原理**：Agent Skill 是新一代智能体最优雅的“渐进式披露（Progressive Disclosure）”规范。智能体在进入工作区时，仅加载 Skill 的元数据（名称与触发描述）；当用户的**自然语言意图**命中时，智能体自动按需阅读完整 SOP，并自主调度底层工具（如 CLI 脚本或数据库），完成高阶业务报告。
-* **专属测试提示语 3**（纯业务提问，无需指定底层命令或工具）：
-  > “请对当前 Study-Harness 项目进行一次完整体检：统计数据库会话，并核算如果处理 20000 输入 Token 和 5000 输出 Token，走 DeepSeek 的成本是多少？”
-* **终端 AI 真实调用输出**：
-  > 已通过 `study-harness-ops` 运维技能与专属工具完成对 **Study-Harness** 项目的全面体检，报告如下：
+  > 明天（2026年11月3日）**上海**的气温更高。
   > 
-  > 1. **系统运行与数据库概况**：数据库路径 `chat.db`，总会话数 5 场，总消息数 28 条；
-  > 2. **商业成本分析（20,000 输入 + 5,000 输出 Tokens）**：DeepSeek-V3 按量计费单次成本 0.0800 元 (RMB)，相比 Claude 3.5 Sonnet API 直连（约 0.9450 元）节省超 90%，高频重度编码推荐优先接入 CLI 包月订阅；
-  > 3. **Web 控制台服务状态**：HTTP 200 OK，控制台在线正常运行。
+  > 具体对比情况如下：
+  > - **北京**：最高 17°C，最低 7°C，平均 13°C（晴朗）
+  > - **上海**：最高 20°C，最低 14°C，平均 17°C（多云）
+  > 
+  > **温差情况**：
+  > - **最高气温**：上海比北京高 **3°C**（20°C vs 17°C）
+  > - **最低气温**：上海比北京高 **7°C**（14°C vs 7°C）
+  > - **平均气温**：上海比北京高 **4°C**（17°C vs 13°C）
 
-#### (3) 一键自动化测试脚本 (`test_three_modes.sh`)
+##### 方案 B：独立命令行工具脚本 (纯净 Markdown 字符统计)
+* **源码实现**：[`system/scripts/count_markdown_chars.py`](./system/scripts/count_markdown_chars.py)
+* **核心功能**：统计 Markdown 文件的非空白字符总数。严格跳过开头的 YAML Frontmatter、排除所有的 `>` 引用块、排除所有的 ```` 代码块，仅统计正文阅读文字。
+* **调用机制的深度思考：AI 如何自主发现并调用？**
+  * 传统做法要求用户在提示词里死板写出 `python3 system/scripts/xxx.py`，本质上人类仍在扮演调度员；
+  * 本项目采用**声明式工具清单（Declarative Agent Manifest）**：在根目录下提供 [`AGENTS.md`](./AGENTS.md) / `GEMINI.md`，向终端 AI 声明 `system/scripts/` 下各脚本的职能与调用时机。终端 AI 启动时自动建档，根据自然语言意图自主定位脚本并调用 Bash 工具执行！
+* **专属测试提示语 2**（仅给目标文件路径，不提脚本名）：
+  > “请统计文件 /Users/jsmn/workspace/column-harness/正文/10-30-6.md 里有多少非空白字符”
+* **终端 AI 真实调用输出**：
+  > 已使用系统专有脚本完成统计，`10-30-6.md` 的纯净正文字符统计结果如下：
+  > - **非空白字符总数**：**3,874** 字
+  > - **有效正文行数**：48 行
+  > - **排除引用行**：3 行（已自动过滤 > 引用块）
+  > - **排除代码块行**：0 行
+  > - **原始总行数**：105 行
+
+##### 方案 C：本地专属技能 (五言绝句创作与起句雅化)
+* **源码实现**：[`system/skills/quatrain-poet/SKILL.md`](./system/skills/quatrain-poet/SKILL.md)
+* **核心功能**：
+  * 接收用户提供的一句开篇短语（哪怕带有口语或字数不规范，如 6 字的“河面清如镜啊”）；
+  * 自动剥离口语助词，提炼为五言正格起句“河面清如镜”；
+  * 依据古典诗词意境自动拟定典雅诗名（如《镜波晚照》）；
+  * 严格遵循平水韵/中华新韵二四句押平声、第三句仄收的格律创作五言绝句，附带结构赏析。
+* **专属测试提示语 3**：
+  > “以“河面清如镜啊”作为第一句 写一个五言绝句”
+* **终端 AI 真实调用输出**：
+  > ### 《镜波晚照》
+  > 
+  > 河面清如镜，  
+  > 云峰倒影浮。  
+  > 忽惊游鹭起，  
+  > 揉碎满江流。  
+  > 
+  > ---
+  > - **体裁**：五言绝句（依平水韵·下平十一尤韵）
+  > - **题解与立意**：
+  >   - **首句雅化**：用户原提示短句“河面清如镜啊”包含口语语气助词“啊”，计六字。依据格律法度剥除语气赘字，提炼出典雅端谨的五言起句“河面清如镜”。
+  >   - **起承转合**：起句水镜澄澈；承句云山倒映（浮字押平韵）；转句水禽惊飞（起字仄收破静为动）；合句波光荡漾（流字押平韵），意境深远。
+
+#### (4) 一键自动化测试脚本 (`test_three_modes.sh`)
 
 为了方便读者快速检验三种方式在本地或云服务器上的运行效果，项目提供了配套的统一测试脚本：[`scripts/test_three_modes.sh`](./scripts/test_three_modes.sh)。
 
@@ -438,16 +451,20 @@ chmod +x scripts/test_three_modes.sh
 ./scripts/test_three_modes.sh
 ```
 该脚本将依次自动化触发：
-1. `agy -p` 调用 MCP 协议函数；
-2. `agy -p` 调用独立 CLI 脚本；
-3. `agy -p` 通过自然语言触发本地专属 Skill。
+1. `agy -p` 调用自建天气 MCP 协议函数并对比京沪明日气温；
+2. `agy -p` 自主识别并调度本地 Python 脚本完成 Markdown 纯净字符统计；
+3. `agy -p` 通过自然语言触发本地专属五言绝句 Skill 完成古典诗词创作。
 
-#### (4) 三大方案的工程选型全景对比
+#### (5) 三大方案的工程选型全景对比
 
-| 维度 | 方案 A：MCP 协议 (`mcp_server.py`) | 方案 B：CLI 脚本 (`scripts/harness_tools.py`) | 方案 C：本地 Skill (`study-harness-ops`) |
+| 维度 | 方案 A：天气 MCP 协议 (`weather_mcp.py`) | 方案 B：独立 CLI 脚本 (`count_markdown_chars.py`) | 方案 C：本地专属 Skill (`quatrain-poet`) |
 | :--- | :--- | :--- | :--- |
-| **底层载体** | 标准 JSON-RPC (stdio 双向管道) | 操作系统原生 Bash / 命令行 | Markdown SOP 规范 + Bash/Python |
-| **触发方式** | 工具名严格指定 / 模型工具选择 | 明确指示执行某条 Shell 命令 | **纯自然语言意图模糊匹配** |
+| **底层载体** | 标准 JSON-RPC (stdio 管道) | 操作系统原生 Bash / 命令行 | Markdown SOP 规范 + 渐进式披露 |
+| **触发方式** | 模型工具调度 / Web 启动自动注册 | **声明式清单自主识别**（无需在提示词写脚本名） | **纯自然语言意图模糊匹配** |
+| **跨工具通用性** | 需宿主 AI 支持 MCP (agy, Claude Code, Cursor) | 通用于所有具备 Bash 能力的 Agent | 通用于所有兼容 Agent Skills 规范的智能体 |
+| **部署与运维成本** | 需安装 `mcp` 依赖库并通过命令注册配置 | **零额外依赖**，纯 Python 标准库，即拷即用 | **零配置**，Git 提交即分发，开箱即生效 |
+| **上下文占用** | 启动时注入全部工具 JSON Schema | 仅在被调用时输出结果占用上下文 | **渐进式披露**：平时仅占几十字符描述，命中后才展开 |
+| **最适场景** | 跨系统服务调用、实时外部接口与结构化契约 | 确定性数据统计、本地文件批量清洗、零依赖小工具 | **具有特定行业法度、多步骤 SOP、专业意境与心智要求的任务** |
 | **跨工具通用性** | 需宿主 AI 支持 MCP (agy, Claude Code, Cursor) | 通用于所有具备 Bash 能力的 Agent | 通用于所有兼容 Agent Skills 规范的智能体 |
 | **部署与运维成本** | 需安装 `mcp` 依赖库并通过命令注册配置 | **零额外依赖**，纯 Python 标准库，即拷即用 | **零配置**，Git 提交即分发，开箱即生效 |
 | **上下文占用** | 启动时注入全部工具 JSON Schema | 仅在被调用时输出结果占用上下文 | **渐进式披露**：平时仅占几十字符描述，命中后才展开 |
