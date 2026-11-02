@@ -9,11 +9,13 @@
 * **第 01 讲**：大模型 API 底层通信与前缀缓存（Prompt Caching）极简原理
 * **第 02 讲**：Think-Act-Observe 思考-行动-观察三元核心回路
 * **第 03 讲**：[`chat_web/`](./chat_web) - 现代多轮对话交互控制台（FastAPI + Vue3 + SQLite 历史会话持久化）
-* **第 04 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）、[`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）、[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）、[`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）与 [`.agents/skills/study-harness-ops/`](./.agents/skills/study-harness-ops/)（方案 C: 本地专属 Skill）
+* **第 04 讲**：国内外大语言模型选型与商业算账指南（海外主力包月订阅 vs 国产王牌 API 按量计费）
+* **第 05 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）、[`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）与 Web 控制台终端换芯
+* **第 06 讲**：[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）、[`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）、[`.agents/skills/study-harness-ops/`](./.agents/skills/study-harness-ops/)（方案 C: 本地专属 Skill）与 [`scripts/test_three_modes.sh`](./scripts/test_three_modes.sh)（三大模式一键测试）
 
 ---
 
-## 第 04 讲实战：复用终端里的 AI CLI (`start_kitty.sh`)
+## 第 05 讲实战：复用终端里的 AI CLI (`start_kitty.sh`)
 
 各大顶尖厂商（如 Google、Anthropic）都在其官方终端 CLI 中内置了成熟的 Harness 工程能力（上下文自动压缩剪枝、精准 Diff 补丁、工具调用重试）。**复用终端里的成熟 AI，是普通人开发智能体最省钱、最强大的途径。**
 
@@ -345,7 +347,7 @@ Workbuddy 就会全自动在后台帮你生成本地密钥对、将公钥写入�
 
 ---
 
-### 9. 进阶实战：换成终端 AI 后，原有的自定义 Python 工具函数去哪了？（三大方案：MCP 协议、独立脚本与本地 Skill）
+### 9. 第 06 讲实战：三种方式扩展 AI CLI 的私有业务能力（MCP 协议、独立脚本与本地 Skill）
 
 #### (1) 为什么原来代码里的 `TOOL_MAP` 没被触发？
 
@@ -358,7 +360,7 @@ TOOL_MAP = {
 ```
 当大模型（如 DeepSeek HTTP 接口）返回带有 `tool_calls` 的 JSON 时，我们的 Python 宿主循环拦截该请求并执行本地函数。
 
-而到了第 04 讲，当我们把核心循环换成调用终端 AI（`agy -p` 或 `claude -p`）时：
+而到了第 05/06 讲，当我们把核心循环换成调用终端 AI（`agy -p` 或 `claude -p`）时：
 * **裸 API（如 DeepSeek/OpenAI HTTP）**：相当于“有大脑没手脚”。模型本身只返回一段文本/JSON 表示“我想调用某个函数”，手脚完全靠我们手搓的 Python 宿主循环驱动；
 * **终端 AI（如 agy / Claude Code）**：相当于“全副武装的特种兵”，它们本身就是一套完整的智能体 Harness。官方在内部打磨了极其严密的系统级工具链（文件读写、Bash 执行、Git 差异比对、全库搜索）。通过 `agy -p` 调用时，它在独立的进程沙箱中运行原生系统工具，自然不再经过 Python 宿主中的内存字典。
 
