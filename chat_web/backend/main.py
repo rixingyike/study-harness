@@ -218,6 +218,10 @@ def run_terminal_ai_engine(
         think_tok = usage.get("thinking_tokens", 0)
         tot_tok = usage.get("total_tokens", 0)
 
+        # 【架构注记】：
+        # 官方终端 CLI（如 agy）以 -p --output-format json 运行时，只向外暴露结构化统计指标（含 thinking_tokens），
+        # 具体思维链原文被封装在 CLI 引擎内。此处由 Harness 提取真实指标与会话状态，拼接成调度与推演履历填入 thinking 字段，
+        # 既保留了 Web 界面的折叠卡片交互，又方便读者对照代码看清外层调度与内层思考的真实边界。
         thinking_logs = [
             f"--- 【终端 AI CLI 调度 Think】向本地终端发送请求 (Google Gemini via agy CLI) ---",
             f"【会话绑定 Session】Web 会话: {session_id or '未绑定'} | 终端会话: {new_conv_id or '新建'}",
