@@ -9,7 +9,7 @@
 * **第 01 讲**：大模型 API 底层通信与前缀缓存（Prompt Caching）极简原理
 * **第 02 讲**：Think-Act-Observe 思考-行动-观察三元核心回路
 * **第 03 讲**：[`chat_web/`](./chat_web) - 现代多轮对话交互控制台（FastAPI + Vue3 + SQLite 历史会话持久化）
-* **第 04 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）、[`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）、[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）与 [`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）
+* **第 04 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）、[`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）、[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）、[`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）与 [`.agents/skills/study-harness-ops/`](./.agents/skills/study-harness-ops/)（方案 C: 本地专属 Skill）
 
 ---
 
@@ -345,7 +345,7 @@ Workbuddy 就会全自动在后台帮你生成本地密钥对、将公钥写入�
 
 ---
 
-### 9. 进阶实战：换成终端 AI 后，原有的自定义 Python 工具函数去哪了？（方案 A MCP 协议与方案 B 独立脚本工具）
+### 9. 进阶实战：换成终端 AI 后，原有的自定义 Python 工具函数去哪了？（三大方案：MCP 协议、独立脚本与本地 Skill）
 
 #### (1) 为什么原来代码里的 `TOOL_MAP` 没被触发？
 
@@ -362,9 +362,9 @@ TOOL_MAP = {
 * **裸 API（如 DeepSeek/OpenAI HTTP）**：相当于“有大脑没手脚”。模型本身只返回一段文本/JSON 表示“我想调用某个函数”，手脚完全靠我们手搓的 Python 宿主循环驱动；
 * **终端 AI（如 agy / Claude Code）**：相当于“全副武装的特种兵”，它们本身就是一套完整的智能体 Harness。官方在内部打磨了极其严密的系统级工具链（文件读写、Bash 执行、Git 差异比对、全库搜索）。通过 `agy -p` 调用时，它在独立的进程沙箱中运行原生系统工具，自然不再经过 Python 宿主中的内存字典。
 
-#### (2) 如何让终端 AI 调用我们自定义的专属业务函数？
+#### (2) 三大主流工程扩展方案实战与测试提示语设计
 
-现代工业界针对终端智能体提供了两条标准扩展路线。本仓库对这两种方案均已提供完整可运行的代码实现：
+现代工业界针对终端智能体提供了三条层次分明的工具扩展与意图挂载方案。本仓库对这三种方案均已提供完整可运行的代码实现与自动化测试：
 
 ##### 方案 A：基于标准 MCP (Model Context Protocol) 协议拓展
 * **源码实现**：[`mcp_server.py`](./mcp_server.py)
@@ -376,25 +376,16 @@ TOOL_MAP = {
   ```bash
   agy mcp add study-tools $(which python3) $(pwd)/mcp_server.py
   ```
-  查看注册状态：
-  ```bash
-  agy mcp list
-  # 输出:
-  # NAME         TYPE   STATUS   COMMAND/URL
-  # study-tools  stdio  enabled  /path/to/python3 /path/to/mcp_server.py
-  ```
-* **终端 AI 调用实测**：
-  ```bash
-  agy -p "请调用 study-tools 里的 calculate_token_cost 工具计算 deepseek 输入 10000 tokens 输出 2000 tokens 的成本" --dangerously-skip-permissions
-  ```
-  **实测输出结果**：
+* **专属测试提示语 1**：
+  > “请调用 study-tools 里的 calculate_token_cost 工具，计算 deepseek 模型输入 10000、输出 2000 的 Token 成本，并输出折算建议。”
+* **终端 AI 真实调用输出**：
   > 【Token 计费核算 - 国产 DeepSeek-V3 API (元/千Tokens)】
   > - **输入**：10,000 Tokens
   > - **输出**：2,000 Tokens
   > - **单次估算成本**：0.0360 RMB
   > - **建议**：推荐重度开发走包月/终端 CLI 复用路线，日常微调走 DeepSeek 按量路线。
 
-##### 方案 B：独立命令行工具脚本 (Scripting & CLI / Skill 工具化)
+##### 方案 B：独立命令行工具脚本 (Scripting & CLI 工具化)
 * **源码实现**：[`scripts/harness_tools.py`](./scripts/harness_tools.py)
 * **核心原理**：现代终端 AI 最强大、最通用的原生工具就是 **Bash 执行**。我们无需配置任何守护进程和协议框架，直接把业务逻辑写成带命令行参数的独立 Python 脚本。
 * **支持的 CLI 指令**：
@@ -408,20 +399,46 @@ TOOL_MAP = {
   # 3. 探测本地 Web 服务 (port 3010) 健康状态
   python3 scripts/harness_tools.py status
   ```
-* **终端 AI 调用实测**：
-  ```bash
-  agy -p "执行本地脚本 python3 scripts/harness_tools.py summary 并用一句话总结会话总数" --dangerously-skip-permissions
-  ```
-  **实测输出结果**：
+* **专属测试提示语 2**：
+  > “请执行本地脚本 python3 scripts/harness_tools.py summary 并用一句话总结当前数据库的会话总数。”
+* **终端 AI 真实调用输出**：
   > 执行 scripts/harness_tools.py 的概况统计结果显示，当前数据库中共有 5 个会话。
 
-#### (3) 两种方案的工程选型建议
+##### 方案 C：本地专属技能 (Agent Skill / 渐进式披露)
+* **源码实现**：[`.agents/skills/study-harness-ops/SKILL.md`](./.agents/skills/study-harness-ops/SKILL.md)
+* **核心原理**：Agent Skill 是新一代智能体最优雅的“渐进式披露（Progressive Disclosure）”规范。智能体在进入工作区时，仅加载 Skill 的元数据（名称与触发描述）；当用户的**自然语言意图**命中时，智能体自动按需阅读完整 SOP，并自主调度底层工具（如 CLI 脚本或数据库），完成高阶业务报告。
+* **专属测试提示语 3**（纯业务提问，无需指定底层命令或工具）：
+  > “请对当前 Study-Harness 项目进行一次完整体检：统计数据库会话，并核算如果处理 20000 输入 Token 和 5000 输出 Token，走 DeepSeek 的成本是多少？”
+* **终端 AI 真实调用输出**：
+  > 已通过 `study-harness-ops` 运维技能与专属工具完成对 **Study-Harness** 项目的全面体检，报告如下：
+  > 
+  > 1. **系统运行与数据库概况**：数据库路径 `chat.db`，总会话数 5 场，总消息数 28 条；
+  > 2. **商业成本分析（20,000 输入 + 5,000 输出 Tokens）**：DeepSeek-V3 按量计费单次成本 0.0800 元 (RMB)，相比 Claude 3.5 Sonnet API 直连（约 0.9450 元）节省超 90%，高频重度编码推荐优先接入 CLI 包月订阅；
+  > 3. **Web 控制台服务状态**：HTTP 200 OK，控制台在线正常运行。
 
-| 维度 | 方案 A：MCP 协议 (`mcp_server.py`) | 方案 B：CLI 脚本 (`scripts/harness_tools.py`) |
-| :--- | :--- | :--- |
-| **通信机制** | 标准 JSON-RPC (stdio 双向管道) | 操作系统原生 Bash / 命令行调用 |
-| **跨工具通用性** | 需宿主 AI 支持 MCP (agy, Claude Code, Cursor) | **通用于所有具备 Bash 能力的 Agent** (agy, Claude, Aider, Codex, 甚至 Bash/Cron) |
-| **部署与运维成本** | 需安装 `mcp` 依赖库并通过命令注册配置 | **零额外依赖**，纯 Python 标准库，即拷即用 |
-| **调试体验** | 需查看 stdio 握手与错误日志 | 终端直接单步敲命令，输入输出纤毫毕现 |
-| **最适场景** | 复杂结构化对象交互、长连接状态机、跨机器多 Agent 共享 | 业务统计排查、数据库读写、运维脚本调度、日常工具扩展 |
+#### (3) 一键自动化测试脚本 (`test_three_modes.sh`)
+
+为了方便读者快速检验三种方式在本地或云服务器上的运行效果，项目提供了配套的统一测试脚本：[`scripts/test_three_modes.sh`](./scripts/test_three_modes.sh)。
+
+赋予权限并一键运行：
+```bash
+chmod +x scripts/test_three_modes.sh
+./scripts/test_three_modes.sh
+```
+该脚本将依次自动化触发：
+1. `agy -p` 调用 MCP 协议函数；
+2. `agy -p` 调用独立 CLI 脚本；
+3. `agy -p` 通过自然语言触发本地专属 Skill。
+
+#### (4) 三大方案的工程选型全景对比
+
+| 维度 | 方案 A：MCP 协议 (`mcp_server.py`) | 方案 B：CLI 脚本 (`scripts/harness_tools.py`) | 方案 C：本地 Skill (`study-harness-ops`) |
+| :--- | :--- | :--- | :--- |
+| **底层载体** | 标准 JSON-RPC (stdio 双向管道) | 操作系统原生 Bash / 命令行 | Markdown SOP 规范 + Bash/Python |
+| **触发方式** | 工具名严格指定 / 模型工具选择 | 明确指示执行某条 Shell 命令 | **纯自然语言意图模糊匹配** |
+| **跨工具通用性** | 需宿主 AI 支持 MCP (agy, Claude Code, Cursor) | 通用于所有具备 Bash 能力的 Agent | 通用于所有兼容 Agent Skills 规范的智能体 |
+| **部署与运维成本** | 需安装 `mcp` 依赖库并通过命令注册配置 | **零额外依赖**，纯 Python 标准库，即拷即用 | **零配置**，Git 提交即分发，开箱即生效 |
+| **上下文占用** | 启动时注入全部工具 JSON Schema | 仅在被调用时输出结果占用上下文 | **渐进式披露**：平时仅占几十字符描述，命中后才展开 |
+| **最适场景** | 复杂结构化对象交互、跨跨机器微服务 | 确定性运维、离线批处理、零依赖小工具 | **面向用户的多步骤业务排查、全景诊断体检与自动化 SOP** |
+
 
