@@ -12,6 +12,7 @@
 * **第 04 讲**：国内外大语言模型选型与商业算账指南（海外主力包月订阅 vs 国产王牌 API 按量计费）
 * **第 05 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）、[`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）与 Web 控制台终端换芯
 * **第 06 讲**：[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）、[`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）、[`.agents/skills/study-harness-ops/`](./.agents/skills/study-harness-ops/)（方案 C: 本地专属 Skill）与 [`scripts/test_three_modes.sh`](./scripts/test_three_modes.sh)（三大模式一键测试）
+* **第 07 讲**：[`scripts/scientist_profiler.py`](./scripts/scientist_profiler.py)（科学家性格画像与潜能诊断）、[`scripts/speculative_systematic_duo.py`](./scripts/speculative_systematic_duo.py)（推测型与条理型异构双智能体协同推演）、[`scripts/topic_evaluator.py`](./scripts/topic_evaluator.py)（课题战略审查与四维打分）、MCP 工具挂载与本地专属 Skills（[`system/skills/`](./system/skills/)）与 [`tests/test_chapter_07.py`](./tests/test_chapter_07.py)（自动化集成测试套件）
 
 ---
 
@@ -471,3 +472,110 @@ chmod +x scripts/test_three_modes.sh
 | **最适场景** | 复杂结构化对象交互、跨跨机器微服务 | 确定性运维、离线批处理、零依赖小工具 | **面向用户的多步骤业务排查、全景诊断体检与自动化 SOP** |
 
 
+
+
+---
+
+## 第 07 讲实战：科学家性格画像、异构双智能体协同与课题战略审查
+
+本讲配套专栏文章**《07 为什么考霸搞不出大发明？《科学研究的艺术》之科学家与战略》**。
+基于剑桥大学老教授 W.I.B. 贝弗里奇的经典名著《科学研究的艺术》第十一章「科学家」与第十章「战略和战术」，我们为研创学者手搓了三套兼具深厚理论底蕴与硬核工程落地的研创武器。
+
+```mermaid
+flowchart LR
+    subgraph S1["前置：学者潜能画像"]
+        A["学者自述 / 笔记"] --> B["scientist-profiler<br>(温度 0.2 纯客观收敛)"]
+        B --> C["学者性格画像.md<br>(反应型/爱因斯坦动机/出洋相韧性/谱系)"]
+    end
+
+    subgraph S2["过程：异构双智能体协同"]
+        D["课题靶点 / 初始灵感"] --> E["推测先锋 Speculative-Agent<br>(巴斯德直觉跳跃 · 温度 0.8)"]
+        E -->|狂想草图 Sparks| F["条理法官 Systematic-Agent<br>(冷面审查求证 · 温度 0.2)"]
+        F --> G["可落地实验验证 SOP"]
+    end
+
+    subgraph S3["立项：战略战术四维审查"]
+        H["立项方案 / 课题计划"] --> I["topic-evaluator<br>(四维结构化打分 · 满分 100)"]
+        I --> J["三级计划分权 (30分)<br>理论应用互哺 (25分)<br>探索发展配比 (25分)<br>战略搁置止损 (20分)"]
+    end
+```
+
+### 1. 三大核心武器与设计哲学
+
+#### (1) 科学家性格画像与潜能诊断引擎 (`scientist_profiler.py`)
+- **理论依据**：贝弗里奇指出，世界上几乎没有十全十美的科学家；开拓者往往在常人眼里脾气叛逆古怪，而应试考试偏袒的往往是规规矩矩的“被动型知识仓库”（如埃利希考不过药理剂量却砸出神药六零六）。
+- **四维诊断**：
+  1. **反应型 vs 被动型**：是否具备敢于怀疑既成教条的开拓者原生土壤；
+  2. **爱因斯坦科研三分法**：竞技场运动员 vs 职业谋生者 vs 真正献身者；
+  3. **出洋相心理韧性**：弗莱克斯纳之问（“你准备好在所里当众出洋相了吗？”）与巴斯德式的顽强坚持力；
+  4. **认知谱系**：推测型（浪漫派） vs 条理型（古典派）比例分布。
+- **执行温度**：`0.2`（冷酷严谨、拒绝廉价客套与阿谀奉承）。
+- **产出文件**：默认归档至 `认知/学者性格画像.md`。
+
+#### (2) 推测型与条理型异构双智能体协同推演器 (`speculative_systematic_duo.py`)
+- **理论依据**：原书第十一章推测型与条理型黄金协同机制（泰勒博士大型研究机构法）。
+- **核心机制**：
+  - **推测先锋（Speculative-Agent · 温度 0.8）**：凭敏锐直觉跳跃前行，跨越事实提出 2~3 个最具颠覆性的假说雏形；
+  - **条理法官（Systematic-Agent · 温度 0.2）**：冷酷接管案卷，排查逻辑漏洞，挑选核心火种，设计具备单一变量与严密基线对照的工程化验证方案，并焊死不可逾越的止损铁轨（防止浪漫派留下烂尾楼）。
+
+#### (3) 课题战略审查与四维打分引擎 (`topic_evaluator.py`)
+- **理论依据**：原书第十章《战略和战术》中实用（组织/计划）与理想（自由/纯理论）的辩证平衡。
+- **四维评分模型 (满分 100 分)**：
+  1. **三级计划分权合理性 (30分)**：宏观定靶心筹粮饷、中观定主攻山头、微观战术 100% 交由一线自由发挥（严禁后方行政瞎指挥）；
+  2. **理论与应用深度互哺度 (25分)**：杜绝狭隘实用主义，深入穿透底层微观机理，以理论反哺应用；
+  3. **探索性与发展性风险配比 (25分)**：冒险开拓新大陆与稳妥修筑堤坝的接力机制；
+  4. **战略性搁置与止损机制 (20分)**：死锁时的“拔电源”潜意识孵化气口与务实放弃底线。
+- **执行温度**：`0.2`。
+- **产出文件**：默认归档至 `认知/课题战略审查报告.md`。
+
+---
+
+### 2. 调用方式与实操指南
+
+#### 方式一：独立 CLI 命令行工具
+```bash
+# 1. 运行科学家性格诊断
+python3 scripts/scientist_profiler.py --name "张学者" --text "我的工作习惯与困惑..." --output "认知/学者性格画像.md"
+
+# 2. 运行异构双智能体协同推演
+python3 scripts/speculative_systematic_duo.py --topic "如何利用大模型自动发现中医药经典配伍反常规律？" --output "认知/双智能体推演报告.md"
+
+# 3. 运行课题战略审查与打分
+python3 scripts/topic_evaluator.py --title "某科研立项课题" --desc "课题目标、分工与技术路线..." --output "认知/课题战略审查报告.md"
+```
+
+#### 方式二：标准 MCP 工具协议跨进程调用 (`mcp_server.py`)
+在任何支持 MCP 的宿主 AI（如 Antigravity CLI、Claude Code 等）中，已自动挂载如下专属工具：
+- `profile_scientist(profile_text, scholar_name, output_file)`
+- `collaborate_duo(topic_or_spark, max_rounds, output_file)`
+- `evaluate_topic(topic_description, topic_title, output_file)`
+
+#### 方式三：本地专属 Skills 声明式触发 (`system/skills/`)
+项目内置了符合 Agent Skills 规范的专属技能，智能体可根据自然语言意图无感自动调用：
+- `system/skills/scientist-profiler/SKILL.md`
+- `system/skills/speculative-systematic-duo/SKILL.md`
+- `system/skills/topic-evaluator/SKILL.md`
+
+---
+
+### 3. 一键自动化集成测试套件
+
+执行配套自动化集成测试套件，全面核验底层通信与三大引擎：
+```bash
+python3 tests/test_chapter_07.py
+```
+
+**测试通过实测输出**：
+```text
+[+] 正在启动第 07 讲集成测试，API Key: sk-6d3...
+  [✓] DeepSeek 通信正常
+  [✓] 科学家性格画像引擎测试通过
+  [✓] 异构双智能体协同推演器测试通过
+  [✓] 课题战略审查与四维打分引擎测试通过
+  [✓] MCP Server 5 大工具挂载完整性测试通过
+
+----------------------------------------------------------------------
+Ran 5 tests in 53.933s
+
+OK
+```
