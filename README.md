@@ -553,7 +553,15 @@ flowchart LR
 - `system/skills/speculative-systematic-duo/`（[SKILL.md](./system/skills/speculative-systematic-duo/SKILL.md)）
 - `system/skills/topic-evaluator/`（[SKILL.md](./system/skills/topic-evaluator/SKILL.md)）
 
-**底层模块直接执行验证**：
+#### 方式三：自然语言实测用例（直接在宿主 AI 对话框中测试）
+- **用例 1（测试 `scientist-profiler` / `profile_scientist`）**：
+  > “请帮我做一次学者性格画像与潜能诊断。我的情况是：大学时数学成绩很好，但我总爱琢磨冷门交叉学科，常被老师批评不务正业。参加工作后，我特别受不了领导天天盯日报周报和进度表，很多好思路都是晚上散步时突然蹦出来的。但我最大的弱点是容易喜新厌旧，同时开好几个课题，核心难点摸通后就觉得繁琐枯燥，很难全部收尾；心里想做点颠覆性的东西，又有点怕同行嘲笑我想法幼稚。请客观给我做一次体检，并告诉我怎么搭配数字外骨骼。”
+- **用例 2（测试 `speculative-systematic-duo` / `collaborate_duo`）**：
+  > “我想开辟一个新方向：‘能否利用大语言模型自动比对古今中医药典籍与现代分子生物学数据库，跨时空挖掘出反常的经典配伍规律，并预测未知药物协同机制？’请启动推测与条理异构双智能体协同推演器，让推测先锋先提假说，再让条理法官进行工程化排雷与落地设计。”
+- **用例 3（测试 `topic-evaluator` / `evaluate_topic`）**：
+  > “请对我们团队拟申报的课题《超导量子芯片常温探针研发》进行战略审查与四维打分。方案如下：我们由三名博士组成攻坚团队，组员完全自主安排每日实验与技术细节，但需每周汇报里程碑；先攻克探针底层微观机理，再做实际检测应用；设定了严格止损——如果连续三个月无法观测到有效共振信号，课题立即冻结并转向备用方案。请给出百分制评分、各维度扣分原因与修改建议。”
+
+**底层驱动模块直接执行验证**：
 ```bash
 # 1. 运行科学家性格画像 Skill
 python3 system/skills/scientist-profiler/scripts/profiler.py --name "张学者" --text "工作习惯..." --output "认知/学者性格画像.md"
