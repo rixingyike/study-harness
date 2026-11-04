@@ -24,15 +24,9 @@ triggers: ["双智能体协同", "异构智能体", "推测与条理", "浪漫�
    - 工程化方案：设计具备单一变量、严密基线对照与分阶段推进（Pilot 试点 ➔ 逐步排除）的完整 SOP；
    - 止损铁轨：设立不可逾越的边界与失败止损线。
 
-## 使用方法
+## 规范调用方式
 
-### 方式一：终端命令行直接调用
-```bash
-# 针对某个模糊课题进行双智能体深度推演
-python3 scripts/speculative_systematic_duo.py --topic "如何利用 LLM 自动发现文献反常配伍？" --output "认知/双智能体推演报告.md"
-```
-
-### 方式二：通过 MCP 工具跨进程调用
+### 方式一：通过 MCP 服务协议调用 (首选)
 直接在对话中触发 `collaborate_duo` 工具：
 ```json
 {
@@ -40,4 +34,10 @@ python3 scripts/speculative_systematic_duo.py --topic "如何利用 LLM 自动�
   "max_rounds": 1,
   "output_file": "认知/双智能体推演专报.md"
 }
+```
+
+### 方式二：作为原生 Agent Skill 意图触发
+智能体识别协同推演意图后，自动挂载本技能或调度底层执行模块：
+```bash
+python3 system/skills/speculative-systematic-duo/scripts/duo.py --topic "课题描述或初始灵感" --output "认知/双智能体推演专报.md"
 ```

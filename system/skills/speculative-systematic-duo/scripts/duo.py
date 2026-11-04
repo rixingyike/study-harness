@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-speculative_systematic_duo.py: 推测型与条理型异构双智能体协同器 (Chapter 07 配套)
-基于《科学研究的艺术》第十一章推测型（浪漫派/巴斯德）与条理型（古典派/工匠）黄金协同机制（泰勒博士大型研究机构法），
-由推测先锋（温度 0.8）负责大胆直觉跳跃开疆拓土，条理法官（温度 0.2）负责冷面求证收尾，解决单兵作战的烂尾与平庸困境。
+duo.py: 推测型与条理型异构双智能体协同推演器核心实现 (SKILL speculative-systematic-duo 配套)
+理论依据：贝弗里奇《科学研究的艺术》第十一章推测型与条理型黄金协同机制
 """
 
 import os
@@ -12,9 +11,11 @@ import argparse
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parents[3]
+for p in [PROJECT_ROOT / "system" / "scripts", PROJECT_ROOT / "scripts"]:
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 from deepseek_client import call_deepseek
 
@@ -51,25 +52,16 @@ def collaborate_duo(
     max_rounds: int = 1,
     output_path: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    运行推测型与条理型异构双智能体协同推演
-    
-    参数:
-        topic_or_spark: 待研究的课题靶点、初始灵感或技术难题
-        max_rounds: 交互轮次（默认 1 轮完整先锋狂想+工匠收尾）
-        output_path: 可选的 Markdown 输出保存路径
-    """
+    """运行推测型与条理型异构双智能体协同推演"""
     if not topic_or_spark.strip():
         raise ValueError("输入课题为空，无法启动双智能体推演。")
     
-    # 第一步：浪漫派先锋发散出击（温度 0.8）
     speculative_messages = [
         {"role": "system", "content": SPECULATIVE_PROMPT},
         {"role": "user", "content": f"【拟探索的研究课题 / 灵感火花】：\n\n{topic_or_spark}\n\n请推测型先锋立刻展开狂想，给出破局假说！"}
     ]
     speculative_output = call_deepseek(speculative_messages, temperature=0.8, max_tokens=2500)
     
-    # 第二步：古典派法官冷酷接管与求证工程化（温度 0.2）
     systematic_messages = [
         {"role": "system", "content": SYSTEMATIC_PROMPT},
         {"role": "user", "content": f"【原始研究课题】：\n{topic_or_spark}\n\n【浪漫派先锋（Speculative-Agent）提交的狂想草图】：\n{speculative_output}\n\n请条理派工匠法官立刻接管案卷，进行冷面审查并锻造为可执行的工程方案！"}
@@ -121,10 +113,9 @@ def main():
     parser = argparse.ArgumentParser(description="Study-Harness: 推测型与条理型异构双智能体协同器")
     parser.add_argument("--topic", "-t", default="", help="待推演的研究课题或灵感文本")
     parser.add_argument("--file", "-f", default="", help="包含课题描述的文件路径")
-    parser.add_argument("--output", "-o", default="", help="保存协同报告的文件路径 (如 认知/双智能体推演报告.md)")
+    parser.add_argument("--output", "-o", default="", help="保存协同报告的文件路径")
     
     args = parser.parse_args()
-    
     topic = args.topic
     if args.file:
         f_p = Path(args.file)

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-topic_evaluator.py: 课题战略审查与四维打分引擎 (Chapter 07 配套)
-基于《科学研究的艺术》第十章「战略和战术」中实用（计划/应用）与理想（自由/纯理论）的辩证平衡哲学，
-对学者拟开展的研究课题进行四维结构化战略审查并给出百分制量化评分（0–100 分）。
+evaluator.py: 课题战略审查与四维打分引擎核心实现 (SKILL topic-evaluator 配套)
+理论依据：贝弗里奇《科学研究的艺术》第十章「战略和战术」
 """
 
 import os
@@ -12,9 +11,11 @@ import argparse
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parents[3]
+for p in [PROJECT_ROOT / "system" / "scripts", PROJECT_ROOT / "scripts"]:
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 from deepseek_client import call_deepseek
 
@@ -77,14 +78,7 @@ def evaluate_topic(
     topic_title: str = "拟研课题",
     output_path: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    运行课题战略审查与四维打分
-    
-    参数:
-        topic_description: 课题的目标、技术路线、人员分工或立项规划说明
-        topic_title: 课题名称或代号
-        output_path: 可选的 Markdown 输出保存路径 (如 认知/课题战略审查报告.md)
-    """
+    """运行课题战略审查与四维打分"""
     if not topic_description.strip():
         raise ValueError("课题描述为空，无法进行战略审查。")
     
@@ -113,10 +107,9 @@ def main():
     parser.add_argument("--title", "-t", default="拟研课题", help="课题名称")
     parser.add_argument("--desc", "-d", default="", help="课题详细规划描述文本")
     parser.add_argument("--file", "-f", default="", help="包含课题规划描述的文件路径")
-    parser.add_argument("--output", "-o", default="", help="审查报告保存的目标路径 (如 认知/课题战略审查报告.md)")
+    parser.add_argument("--output", "-o", default="", help="审查报告保存的目标路径")
     
     args = parser.parse_args()
-    
     content = args.desc
     if args.file:
         f_p = Path(args.file)

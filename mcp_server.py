@@ -79,12 +79,24 @@ def calculate_token_cost(model_name: str, input_tokens: int, output_tokens: int)
         f"省钱建议: 推荐重度开发走包月/终端 CLI 复用路线，日常微调走 DeepSeek 按量路线。"
     )
 
-# ----------------- 专栏第 07 讲配套：科学家性格、异构双智能体与战略战术评估 -----------------
+# ----------------- 专栏第 07 讲配套：科学家性格、异构双智能体与战略战术评估 (MCP 工具) -----------------
+
+def _load_skill_script(skill_name: str, script_name: str):
+    """动态加载 system/skills/<skill-name>/scripts/<script_name>.py 模块"""
+    import importlib.util
+    script_path = PROJECT_ROOT / "system" / "skills" / skill_name / "scripts" / f"{script_name}.py"
+    if not script_path.exists():
+        # 回退兼容 scripts/ 目录
+        script_path = PROJECT_ROOT / "scripts" / f"{script_name}.py"
+    spec = importlib.util.spec_from_file_location(f"{skill_name}_{script_name}", script_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 @app.tool()
 def profile_scientist(profile_text: str, scholar_name: str = "研创学者", output_file: str = "") -> str:
     """
-    【第 07 讲配套】科学家性格画像与潜能诊断引擎 (scientist-profiler)
+    【第 07 讲配套 MCP 工具】科学家性格画像与潜能诊断引擎 (scientist-profiler)
     基于《科学研究的艺术》第十一章「科学家」，从反应型/被动型人格、爱因斯坦科研三分法、
     出洋相心理韧性、推测型/条理型谱系进行客观诊断 (执行温度 0.2)。
     
@@ -94,8 +106,8 @@ def profile_scientist(profile_text: str, scholar_name: str = "研创学者", out
         output_file: 可选的 Markdown 报告保存路径 (如 认知/学者性格画像.md)
     """
     try:
-        from scripts.scientist_profiler import profile_scientist as run_profile
-        res = run_profile(profile_text, scholar_name=scholar_name, output_path=output_file or None)
+        mod = _load_skill_script("scientist-profiler", "profiler")
+        res = mod.profile_scientist(profile_text, scholar_name=scholar_name, output_path=output_file or None)
         saved_msg = f"\n\n[+] 报告已归档至: {res['saved_path']}" if res.get('saved_path') else ""
         return res["report"] + saved_msg
     except Exception as e:
@@ -104,7 +116,7 @@ def profile_scientist(profile_text: str, scholar_name: str = "研创学者", out
 @app.tool()
 def collaborate_duo(topic_or_spark: str, max_rounds: int = 1, output_file: str = "") -> str:
     """
-    【第 07 讲配套】推测型与条理型异构双智能体协同器 (speculative-systematic-duo)
+    【第 07 讲配套 MCP 工具】推测型与条理型异构双智能体协同器 (speculative-systematic-duo)
     基于《科学研究的艺术》第十一章推测型（巴斯德浪漫派）与条理型（工匠古典派）黄金协同机制。
     浪漫派（温度 0.8）直觉跳跃突破思维死角，条理派（温度 0.2）冷面审查锻造可落地实验 SOP。
     
@@ -114,8 +126,8 @@ def collaborate_duo(topic_or_spark: str, max_rounds: int = 1, output_file: str =
         output_file: 可选的 Markdown 协同专报保存路径
     """
     try:
-        from scripts.speculative_systematic_duo import collaborate_duo as run_duo
-        res = run_duo(topic_or_spark, max_rounds=max_rounds, output_path=output_file or None)
+        mod = _load_skill_script("speculative-systematic-duo", "duo")
+        res = mod.collaborate_duo(topic_or_spark, max_rounds=max_rounds, output_path=output_file or None)
         saved_msg = f"\n\n[+] 协同专报已归档至: {res['saved_path']}" if res.get('saved_path') else ""
         return res["full_report"] + saved_msg
     except Exception as e:
@@ -124,7 +136,7 @@ def collaborate_duo(topic_or_spark: str, max_rounds: int = 1, output_file: str =
 @app.tool()
 def evaluate_topic(topic_description: str, topic_title: str = "拟研课题", output_file: str = "") -> str:
     """
-    【第 07 讲配套】课题战略审查与四维打分引擎 (topic-evaluator)
+    【第 07 讲配套 MCP 工具】课题战略审查与四维打分引擎 (topic-evaluator)
     基于《科学研究的艺术》第十章「战略和战术」的辩证平衡哲学，对课题方案进行四维审查并给出百分制评分 (执行温度 0.2)。
     审查维度：三级计划分权 (30分)、理论与应用互哺 (25分)、探索性与发展性配比 (25分)、战略性搁置与止损机制 (20分)。
     
@@ -134,8 +146,8 @@ def evaluate_topic(topic_description: str, topic_title: str = "拟研课题", ou
         output_file: 可选的 Markdown 审查报告保存路径 (如 认知/课题战略审查报告.md)
     """
     try:
-        from scripts.topic_evaluator import evaluate_topic as run_eval
-        res = run_eval(topic_description, topic_title=topic_title, output_path=output_file or None)
+        mod = _load_skill_script("topic-evaluator", "evaluator")
+        res = mod.evaluate_topic(topic_description, topic_title=topic_title, output_path=output_file or None)
         saved_msg = f"\n\n[+] 课题审查报告已归档至: {res['saved_path']}" if res.get('saved_path') else ""
         return res["report"] + saved_msg
     except Exception as e:

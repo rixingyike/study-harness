@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-scientist_profiler.py: 科学家性格画像与潜能诊断引擎 (Chapter 07 配套)
-基于百年经典《科学研究的艺术》第十一章「科学家」，
-对学者的性格画像、内在驱动力、出洋相心理韧性以及推测/条理认知谱系进行深度客观诊断。
+profiler.py: 科学家性格画像与潜能诊断引擎核心实现 (SKILL scientist-profiler 配套)
+理论依据：贝弗里奇《科学研究的艺术》第十一章「科学家」
 """
 
 import os
@@ -12,10 +11,12 @@ import argparse
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-# 导入统一的 DeepSeek 客户端
-SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
+# 将 system/scripts 加入路径以导入通用客户端
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parents[3]
+for p in [PROJECT_ROOT / "system" / "scripts", PROJECT_ROOT / "scripts"]:
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 from deepseek_client import call_deepseek
 
@@ -39,7 +40,7 @@ SYSTEM_PROMPT = """你是一位深谙百年科技史与科研心理学的资深�
 
 【维度四：科学头脑认知谱系定位（推测型 vs 条理型）】
 - 推测型 / 浪漫派（Speculative/Romantic）：凭直觉跳跃前行，早饭还没吃完脑子里已经冒出三个狂想，擅长开辟新领域，但容易粗糙肤浅、留下烂尾楼（如巴斯德）；
-- 条理型 / 古典派（Systematic/Classical）：没有铁证绝不多迈半步，工作井井有条、像冷面裁判步步求证，善于把发现臻于完善，但缺乏从零到一的破局冲击力。
+- 条理型 / 古典派（Systematic/Classical）：没有铁证绝不多迈半步，工作方法井井有条、像冷面裁判步步求证，善于把发现臻于完善，但缺乏从零到一的破局冲击力。
 
 【输出规范格式】：
 请严格按以下 Markdown 格式输出诊断报告：
@@ -80,14 +81,7 @@ def profile_scientist(
     scholar_name: str = "研创学者",
     output_path: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    运行科学家性格画像与潜能诊断
-    
-    参数:
-        profile_text: 学者的经历自述、科研笔记、日常习惯或工作总结
-        scholar_name: 学者姓名或代号
-        output_path: 可选的 Markdown 输出保存路径 (例如 '认知/学者性格画像.md')
-    """
+    """运行科学家性格画像与潜能诊断"""
     if not profile_text.strip():
         raise ValueError("输入内容为空，无法进行性格诊断。")
     
@@ -96,7 +90,6 @@ def profile_scientist(
         {"role": "user", "content": f"【学者姓名/标识】：{scholar_name}\n\n【学者背景材料与工作自述】：\n\n{profile_text}"}
     ]
     
-    # 严格使用 0.2 温度执行收敛诊断
     report = call_deepseek(messages, temperature=0.2, max_tokens=3500)
     
     saved_path = None
@@ -117,20 +110,18 @@ def main():
     parser.add_argument("--name", "-n", default="研创学者", help="学者姓名或标识")
     parser.add_argument("--text", "-t", default="", help="学者的自述、背景或科研习惯文本")
     parser.add_argument("--file", "-f", default="", help="读取包含自述文本的文件路径")
-    parser.add_argument("--output", "-o", default="", help="诊断报告保存的目标文件路径 (如 认知/学者性格画像.md)")
+    parser.add_argument("--output", "-o", default="", help="诊断报告保存的目标文件路径")
     
     args = parser.parse_args()
-    
     content = args.text
     if args.file:
         f_path = Path(args.file)
         if not f_path.exists():
-            print(f"[错误] 指定的文件不存在: {args.file}", file=sys.stderr)
+            print(f"[错误] 指定文件不存在: {args.file}", file=sys.stderr)
             sys.exit(1)
         content = f_path.read_text(encoding="utf-8")
     
     if not content.strip():
-        # 提供默认的示范自述，便于直接命令行测试
         content = """
 我平时在单位做技术研发与算法研究。我特别反感领导每天要我们填详细的日报周报和进度表，我觉得真正的突破不是按部就班算出来的。
 大学的时候我就不是考高分的学生，考试卷子上的标准答案我总觉得逻辑有漏洞，经常因为跟老师辩论被扣卷面分。

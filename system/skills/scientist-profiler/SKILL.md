@@ -11,7 +11,7 @@ suggested_temperature: 0.2
 > 理论依据：贝弗里奇《科学研究的艺术》第十一章「科学家」  
 > 核心哲学：**世界上几乎没有十全十美的科学家；开拓者往往带有偏执与叛逆；数字外骨骼的使命是补齐人脑的天然性格缺陷。**
 
-本技能是专栏第 07 讲配套的研创前置诊断工具。当学者开始课题或反思自身科研困境时，本技能通过命令行或 MCP 工具直接调用诊断引擎。
+本技能是专栏第 07 讲配套的研创前置诊断工具。当学者开始课题或反思自身科研困境时，本技能通过 MCP 工具或 Agent Skill 直接调用诊断引擎。
 
 ## 核心诊断四维度
 
@@ -25,23 +25,20 @@ suggested_temperature: 0.2
 4. **认知谱系（推测型浪漫派 vs 条理型古典派）**：
    - 浪漫派点子乱飞但易留烂尾楼；古典派严密求证但缺乏突变冲力。
 
-## 使用方法
+## 规范调用方式
 
-### 方式一：终端命令行直接调用
-```bash
-# 1. 交互式诊断已有自述文本
-python3 scripts/scientist_profiler.py --name "张学者" --text "我的工作习惯与困惑..."
-
-# 2. 从文件读取并自动生成报告至 认知/ 目录
-python3 scripts/scientist_profiler.py --name "李博士" --file "my_background.txt" --output "认知/学者性格画像.md"
-```
-
-### 方式二：通过 MCP 工具跨进程调用
-在智能体终端中直接调用 `profile_scientist` 工具：
+### 方式一：通过 MCP 服务协议调用 (首选)
+在智能体终端或 MCP 客户端中调用 `profile_scientist` 工具：
 ```json
 {
-  "profile_text": "...",
+  "profile_text": "学者工作自述或科研笔记...",
   "scholar_name": "学者姓名",
   "output_file": "认知/学者性格画像.md"
 }
+```
+
+### 方式二：作为原生 Agent Skill 意图触发
+智能体识别意图（如“请根据我的科研习惯帮我做一份性格画像与潜能诊断”）后，自动挂载本技能上下文并调用底层驱动：
+```bash
+python3 system/skills/scientist-profiler/scripts/profiler.py --name "张学者" --text "工作自述..." --output "认知/学者性格画像.md"
 ```
