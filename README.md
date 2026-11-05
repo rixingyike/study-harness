@@ -15,6 +15,7 @@
 * **第 07 讲**：科学家潜能诊断技能（[`system/skills/scientist-profiler/`](./system/skills/scientist-profiler/)）、异构双智能体协同与课题打分 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`collaborate_duo`、`evaluate_topic`）与自动化集成测试套件（[`tests/test_chapter_07.py`](./tests/test_chapter_07.py)）
 * **第 08 讲**：想象力激发技能（[`system/skills/imagination-spark/`](./system/skills/imagination-spark/)）、死锁破局急救技能（[`system/skills/deadlock-breaker/`](./system/skills/deadlock-breaker/)）、闪念反刍与双智能体推演 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`ruminate_spark`、`dual_agent_reason`）与自动化集成测试套件（[`tests/test_chapter_08.py`](./tests/test_chapter_08.py)）
 * **第 09 讲**：实验策划技能（[`system/skills/experiment-planner/`](./system/skills/experiment-planner/)）、达尔文打脸笔记技能（[`system/skills/darwin-critic-observer/`](./system/skills/darwin-critic-observer/)）、青霉素反常机遇洞察与张伯伦多假说打擂 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`detect_serendipity`、`chamberlin_hypotheses`）与自动化集成测试套件（[`tests/test_chapter_09.py`](./tests/test_chapter_09.py)）
+* **第 10 讲**：批判性拆书技能（[`system/skills/critical-reader/`](./system/skills/critical-reader/)）、巴克罗夫特极简飞刀技能（[`system/skills/barcroft-cleaver/`](./system/skills/barcroft-cleaver/)）、事实与代码求证探索及五步流水线总控 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`verify_fact_or_code`、`inspect_study_pipeline`）与自动化集成测试套件（[`tests/test_chapter_10.py`](./tests/test_chapter_10.py)）
 
 ---
 
@@ -688,6 +689,56 @@ python3 tests/test_chapter_09.py
 
 ----------------------------------------------------------------------
 Ran 5 tests in 48.301s
+
+OK
+```
+
+---
+
+## 第 10 讲实战：五步研创法与数字外骨骼（批判拆书、实证求证、极简认知与流水线总控）
+
+专栏第 10 讲《从实践论到数字外骨骼：五步研创法与万物皆有 SOP》将毛泽东《实践论》认识论闭环与贝弗里奇科研规矩融为一体，提出“五步研创法”（资料 ➔ 笔记 ➔ 认知 ➔ 假说 ➔ 记录与正文），交付 4 项实战能力（严格区分 2 项原生 Agent 技能与 2 项跨进程 MCP 服务）：
+
+### 1. 四大核心能力设计
+
+#### (1) 批判性文献审阅技能 (SKILL: `critical-reader`)
+- **定位**：原生 Agent 技能（[`system/skills/critical-reader/`](./system/skills/critical-reader/)）。
+- **理论依据**：五步研创法 Step 1「批判性文献审阅」与《实践论》感性认知输入。拒绝买椟还珠的浮躁摘要，冷峻扫描文献的“知识空白（Gap）”与“内在矛盾（Contradictions）”，并将未解缺陷自动沉淀至 `资料/不完美.md` 作为假说靶心（执行温度 0.2）。
+- **底层执行**：`python3 system/skills/critical-reader/scripts/reader.py`
+
+#### (2) 事实与代码求证探索服务 (MCP 工具: `verify_fact_or_code`)
+- **定位**：标准 MCP 服务工具（挂载于 [`mcp_server.py`](./mcp_server.py)）。
+- **理论依据**：五步研创法 Step 2「一手资料探针」与《实践论》实践求证。绝不道听途说，支持“文本事实核验”与“代码探针沙箱实测”双模式，捕获真实输出与执行耗时，沉淀一手求证记录至 `笔记/`（执行温度 0.2）。
+
+#### (3) 巴克罗夫特极简飞刀技能 (SKILL: `barcroft-cleaver`)
+- **定位**：原生 Agent 技能（[`system/skills/barcroft-cleaver/`](./system/skills/barcroft-cleaver/)）。
+- **理论依据**：五步研创法 Step 3「巴克罗夫特极简拆解」与《实践论》理性认知跃迁。面对芜杂多变量与纠缠乱象，外科手术式砍去 80% 次要噪音，死死锁定起支配作用的唯一主要矛盾（Single Dominant Factor），并自动生成与维护 `认知/标签.md` 无损标签索引网络（执行温度 0.2）。
+- **底层执行**：`python3 system/skills/barcroft-cleaver/scripts/cleaver.py`
+
+#### (4) 五步研创流水线总控服务 (MCP 工具: `inspect_study_pipeline`)
+- **定位**：标准 MCP 服务工具（挂载于 [`mcp_server.py`](./mcp_server.py)）。
+- **理论依据**：毛泽东《实践论》“实践-认识-再实践-再认识”闭环总控与五步研创法。全面体检工作区五大核心目录（`资料/` ➔ `笔记/` ➔ `认知/` ➔ `假说/` ➔ `记录/`）流转状态与关键标桩文件，诊断当前研发卡点并输出下一步建议 SOP。
+
+---
+
+### 2. 一键自动化集成测试套件
+
+执行配套自动化集成测试套件，全面核验第 10 讲四大能力：
+```bash
+python3 tests/test_chapter_10.py
+```
+
+**实测输出**：
+```text
+[+] 正在启动第 10 讲集成测试，API Key: sk-6d3...
+  [✓] 批判性文献审阅技能 (SKILL critical-reader) 测试通过
+  [✓] 事实与代码求证探索 MCP 服务 (fact-code-verifier) 测试通过
+  [✓] 巴克罗夫特极简飞刀技能 (SKILL barcroft-cleaver) 测试通过
+  [✓] 五步研创流水线总控 MCP 服务 (study-harness-pipeline) 测试通过
+  [✓] MCP Server 第 10 讲工具挂载完整性测试通过
+
+----------------------------------------------------------------------
+Ran 5 tests in 27.412s
 
 OK
 ```

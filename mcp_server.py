@@ -225,6 +225,45 @@ def chamberlin_hypotheses(problem_or_phenomenon: str, hypothesis_count: int = 3,
     except Exception as e:
         return f"多假说打擂执行异常: {str(e)}"
 
+# ----------------- 专栏第 10 讲配套：求证探索与五步流水线总控 (MCP 服务工具) -----------------
+
+@app.tool()
+def verify_fact_or_code(claim_or_code: str, verification_type: str = "fact", topic_name: str = "待求证条目", output_file: str = "") -> str:
+    """
+    【第 10 讲配套 MCP 工具】事实与代码求证探索服务 (fact-code-verifier)
+    基于五步研创法 Step 2「一手资料与初步探针」与毛泽东《实践论》实践求证。
+    拒绝道听途说，对文本事实主张进行权威基线比对与反例审计；对代码片段进行独立沙箱实测，捕获真实输出与耗时 (执行温度 0.2)。
+    
+    参数:
+        claim_or_code: 待核验的事实主张文本，或待运行实测的 Python 代码片段
+        verification_type: 核验类型，"fact" (文本事实核验) 或 "code" (代码运行探针，默认 "fact")
+        topic_name: 待核验主题代号或名称 (默认 "待求证条目")
+        output_file: 可选的 Markdown 求证笔记保存路径 (如 笔记/求证笔记.md)
+    """
+    try:
+        from system.scripts.fact_code_verifier import verify_claim_or_code as run_verify
+        res = run_verify(claim_or_code, verification_type=verification_type, topic_name=topic_name, output_file=output_file or "")
+        saved_msg = f"\n\n[+] 求证笔记已归档至: {res['saved_path']}" if res.get('saved_path') else ""
+        return res["report"] + saved_msg
+    except Exception as e:
+        return f"实证求证执行异常: {str(e)}"
+
+@app.tool()
+def inspect_study_pipeline(workspace_path: str = "") -> str:
+    """
+    【第 10 讲配套 MCP 工具】五步研创流水线总控与体检服务 (study-harness-pipeline)
+    基于毛泽东《实践论》“实践-认识-再实践-再认识”闭环总控与五步研创法。
+    全面体检工作区五大核心目录 (资料/ 笔记/ 认知/ 假说/ 记录/) 的流转状态、关键标桩文件与流通文档总量，诊断当前研发卡点并输出下一步建议 SOP。
+    
+    参数:
+        workspace_path: 可选的研创工作区路径，留空则默认检测当前项目根目录
+    """
+    try:
+        from system.scripts.pipeline_coordinator import inspect_study_pipeline as run_inspect
+        return run_inspect(workspace_path=workspace_path)
+    except Exception as e:
+        return f"流水线体检诊断异常: {str(e)}"
+
 if __name__ == "__main__":
     # 以标准 stdio 方式启动 MCP 服务
     app.run(transport="stdio")
