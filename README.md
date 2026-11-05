@@ -12,7 +12,7 @@
 * **第 04 讲**：国内外大语言模型选型与商业算账指南（海外主力包月订阅 vs 国产王牌 API 按量计费）
 * **第 05 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）、[`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）与 Web 控制台终端换芯
 * **第 06 讲**：[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）、[`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）、[`.agents/skills/study-harness-ops/`](./.agents/skills/study-harness-ops/)（方案 C: 本地专属 Skill）与 [`scripts/test_three_modes.sh`](./scripts/test_three_modes.sh)（三大模式一键测试）
-* **第 07 讲**：标准 MCP 服务（[`mcp_server.py`](./mcp_server.py) 核心工具：`profile_scientist`、`collaborate_duo`、`evaluate_topic`）、原生 Agent Skills（[`system/skills/`](./system/skills/)：`scientist-profiler`、`speculative-systematic-duo`、`topic-evaluator`）与 [`tests/test_chapter_07.py`](./tests/test_chapter_07.py)（自动化集成测试套件）
+* **第 07 讲**：科学家潜能诊断技能（[`system/skills/scientist-profiler/`](./system/skills/scientist-profiler/)）、异构双智能体协同与课题打分 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`collaborate_duo`、`evaluate_topic`）与自动化集成测试套件（[`tests/test_chapter_07.py`](./tests/test_chapter_07.py)）
 
 ---
 
@@ -500,9 +500,10 @@ flowchart LR
     end
 ```
 
-### 1. 三大核心能力与设计哲学 (SKILL 与 MCP 服务规范)
+### 1. 三大核心能力与设计哲学
 
-#### (1) 科学家性格画像与潜能诊断 (SKILL: `scientist-profiler` | MCP: `profile_scientist`)
+#### (1) 科学家潜能诊断技能 (SKILL: `scientist-profiler`)
+- **定位**：原生 Agent 技能（[`system/skills/scientist-profiler/`](./system/skills/scientist-profiler/)）。
 - **理论依据**：贝弗里奇指出，世界上几乎没有十全十美的科学家；开拓者往往在常人眼里脾气叛逆古怪，而应试考试偏袒的往往是规规矩矩的“被动型知识仓库”（如埃利希考不过药理剂量却砸出神药六零六）。
 - **四维诊断**：
   1. **反应型 vs 被动型**：是否具备敢于怀疑既成教条的开拓者原生土壤；
@@ -512,13 +513,15 @@ flowchart LR
 - **执行温度**：`0.2`（冷酷严谨、拒绝廉价客套与阿谀奉承）。
 - **产出文件**：默认归档至 `认知/学者性格画像.md`。
 
-#### (2) 推测型与条理型异构双智能体协同推演 (SKILL: `speculative-systematic-duo` | MCP: `collaborate_duo`)
+#### (2) 异构双智能体协同推演服务 (MCP 工具: `collaborate_duo`)
+- **定位**：标准 MCP 服务协议跨进程工具（挂载于 [`mcp_server.py`](./mcp_server.py)）。
 - **理论依据**：原书第十一章推测型与条理型黄金协同机制（泰勒博士大型研究机构法）。
 - **核心机制**：
   - **推测先锋（Speculative-Agent · 温度 0.8）**：凭敏锐直觉跳跃前行，跨越事实提出 2~3 个最具颠覆性的假说雏形；
   - **条理法官（Systematic-Agent · 温度 0.2）**：冷酷接管案卷，排查逻辑漏洞，挑选核心火种，设计具备单一变量与严密基线对照的工程化验证方案，并焊死不可逾越的止损铁轨（防止浪漫派留下烂尾楼）。
 
-#### (3) 课题战略审查与四维打分引擎 (SKILL: `topic-evaluator` | MCP: `evaluate_topic`)
+#### (3) 课题打分服务 (MCP 工具: `evaluate_topic`)
+- **定位**：标准 MCP 服务协议跨进程工具（挂载于 [`mcp_server.py`](./mcp_server.py)）。
 - **理论依据**：原书第十章《战略和战术》中实用（组织/计划）与理想（自由/纯理论）的辩证平衡。
 - **四维评分模型 (满分 100 分)**：
   1. **三级计划分权合理性 (30分)**：宏观定靶心筹粮饷、中观定主攻山头、微观战术 100% 交由一线自由发挥（严禁后方行政瞎指挥）；
@@ -532,46 +535,36 @@ flowchart LR
 
 ### 2. 调用方式与实操指南
 
-#### 方式一：标准 MCP 服务协议跨进程调用 (`mcp_server.py`)
-在任何支持 MCP 的宿主 AI（如 Antigravity CLI、Claude Code 等）中，已通过 `mcp_server.py` 挂载原生工具：
-- `profile_scientist(profile_text, scholar_name, output_file)`
+#### 方式一：Agent Skill 原生意图触发与执行 (`system/skills/`)
+科学家潜能诊断作为专属技能，智能体可根据自然语言意图无感自动调用：
+- `system/skills/scientist-profiler/`（[SKILL.md](./system/skills/scientist-profiler/SKILL.md)）
+
+**底层驱动模块直接执行**：
+```bash
+python3 system/skills/scientist-profiler/scripts/profiler.py --name "张学者" --text "工作习惯自述..." --output "认知/学者性格画像.md"
+```
+
+#### 方式二：标准 MCP 服务协议跨进程调用 (`mcp_server.py`)
+在任何支持 MCP 的宿主 AI（如 Antigravity CLI、Claude Code 等）中，已通过 `mcp_server.py` 挂载原生服务工具：
 - `collaborate_duo(topic_or_spark, max_rounds, output_file)`
 - `evaluate_topic(topic_description, topic_title, output_file)`
 
 **MCP 工具调用参数示例**：
 ```json
 {
-  "profile_text": "学者经历自述或科研困惑...",
-  "scholar_name": "张学者",
-  "output_file": "认知/学者性格画像.md"
+  "topic_or_spark": "如何利用大模型自动发现中医药经典配伍反常规律？",
+  "max_rounds": 1,
+  "output_file": "认知/双智能体推演报告.md"
 }
 ```
 
-#### 方式二：Agent Skills 原生意图触发与执行 (`system/skills/`)
-符合 Agent Skills 规范的专属技能，智能体可根据自然语言意图无感自动调用：
-- `system/skills/scientist-profiler/`（[SKILL.md](./system/skills/scientist-profiler/SKILL.md)）
-- `system/skills/speculative-systematic-duo/`（[SKILL.md](./system/skills/speculative-systematic-duo/SKILL.md)）
-- `system/skills/topic-evaluator/`（[SKILL.md](./system/skills/topic-evaluator/SKILL.md)）
-
 #### 方式三：自然语言实测用例（直接在宿主 AI 对话框中测试）
-- **用例 1（测试 `scientist-profiler` / `profile_scientist`）**：
+- **用例 1（测试 `scientist-profiler` 技能）**：
   > “请帮我做一次学者性格画像与潜能诊断。我的情况是：大学时数学成绩很好，但我总爱琢磨冷门交叉学科，常被老师批评不务正业。参加工作后，我特别受不了领导天天盯日报周报和进度表，很多好思路都是晚上散步时突然蹦出来的。但我最大的弱点是容易喜新厌旧，同时开好几个课题，核心难点摸通后就觉得繁琐枯燥，很难全部收尾；心里想做点颠覆性的东西，又有点怕同行嘲笑我想法幼稚。请客观给我做一次体检，并告诉我怎么搭配数字外骨骼。”
-- **用例 2（测试 `speculative-systematic-duo` / `collaborate_duo`）**：
+- **用例 2（测试 `collaborate_duo` MCP 服务）**：
   > “我想开辟一个新方向：‘能否利用大语言模型自动比对古今中医药典籍与现代分子生物学数据库，跨时空挖掘出反常的经典配伍规律，并预测未知药物协同机制？’请启动推测与条理异构双智能体协同推演器，让推测先锋先提假说，再让条理法官进行工程化排雷与落地设计。”
-- **用例 3（测试 `topic-evaluator` / `evaluate_topic`）**：
+- **用例 3（测试 `evaluate_topic` MCP 服务）**：
   > “请对我们团队拟申报的课题《超导量子芯片常温探针研发》进行战略审查与四维打分。方案如下：我们由三名博士组成攻坚团队，组员完全自主安排每日实验与技术细节，但需每周汇报里程碑；先攻克探针底层微观机理，再做实际检测应用；设定了严格止损——如果连续三个月无法观测到有效共振信号，课题立即冻结并转向备用方案。请给出百分制评分、各维度扣分原因与修改建议。”
-
-**底层驱动模块直接执行验证**：
-```bash
-# 1. 运行科学家性格画像 Skill
-python3 system/skills/scientist-profiler/scripts/profiler.py --name "张学者" --text "工作习惯..." --output "认知/学者性格画像.md"
-
-# 2. 运行双智能体协同推演 Skill
-python3 system/skills/speculative-systematic-duo/scripts/duo.py --topic "如何利用大模型自动发现中医药经典配伍反常规律？" --output "认知/双智能体推演报告.md"
-
-# 3. 运行课题战略审查与四维打分 Skill
-python3 system/skills/topic-evaluator/scripts/evaluator.py --title "某科研立项课题" --desc "课题目标、分工与技术路线..." --output "认知/课题战略审查报告.md"
-```
 
 ---
 

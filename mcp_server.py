@@ -79,7 +79,7 @@ def calculate_token_cost(model_name: str, input_tokens: int, output_tokens: int)
         f"省钱建议: 推荐重度开发走包月/终端 CLI 复用路线，日常微调走 DeepSeek 按量路线。"
     )
 
-# ----------------- 专栏第 07 讲配套：科学家性格、异构双智能体与战略战术评估 (MCP 工具) -----------------
+# ----------------- 专栏第 07 讲配套：异构双智能体协同与课题打分 (MCP 服务工具) -----------------
 
 def _load_skill_script(skill_name: str, script_name: str):
     """动态加载 system/skills/<skill-name>/scripts/<script_name>.py 模块"""
@@ -92,26 +92,6 @@ def _load_skill_script(skill_name: str, script_name: str):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
-
-@app.tool()
-def profile_scientist(profile_text: str, scholar_name: str = "研创学者", output_file: str = "") -> str:
-    """
-    【第 07 讲配套 MCP 工具】科学家性格画像与潜能诊断引擎 (scientist-profiler)
-    基于《科学研究的艺术》第十一章「科学家」，从反应型/被动型人格、爱因斯坦科研三分法、
-    出洋相心理韧性、推测型/条理型谱系进行客观诊断 (执行温度 0.2)。
-    
-    参数:
-        profile_text: 学者的经历自述、科研笔记、日常习惯或工作总结
-        scholar_name: 学者姓名或代号 (默认 "研创学者")
-        output_file: 可选的 Markdown 报告保存路径 (如 认知/学者性格画像.md)
-    """
-    try:
-        mod = _load_skill_script("scientist-profiler", "profiler")
-        res = mod.profile_scientist(profile_text, scholar_name=scholar_name, output_path=output_file or None)
-        saved_msg = f"\n\n[+] 报告已归档至: {res['saved_path']}" if res.get('saved_path') else ""
-        return res["report"] + saved_msg
-    except Exception as e:
-        return f"科学家性格诊断执行异常: {str(e)}"
 
 @app.tool()
 def collaborate_duo(topic_or_spark: str, max_rounds: int = 1, output_file: str = "") -> str:
