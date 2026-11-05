@@ -13,6 +13,7 @@
 * **第 05 讲**：[`start_kitty.sh`](./start_kitty.sh)（服务端终端守护脚本）、[`connect.sh`](./connect.sh)（macOS 本地一键直连脚本）与 Web 控制台终端换芯
 * **第 06 讲**：[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）、[`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）、[`.agents/skills/study-harness-ops/`](./.agents/skills/study-harness-ops/)（方案 C: 本地专属 Skill）与 [`scripts/test_three_modes.sh`](./scripts/test_three_modes.sh)（三大模式一键测试）
 * **第 07 讲**：科学家潜能诊断技能（[`system/skills/scientist-profiler/`](./system/skills/scientist-profiler/)）、异构双智能体协同与课题打分 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`collaborate_duo`、`evaluate_topic`）与自动化集成测试套件（[`tests/test_chapter_07.py`](./tests/test_chapter_07.py)）
+* **第 08 讲**：想象力激发技能（[`system/skills/imagination-spark/`](./system/skills/imagination-spark/)）、死锁破局急救技能（[`system/skills/deadlock-breaker/`](./system/skills/deadlock-breaker/)）、闪念反刍与双智能体推演 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`ruminate_spark`、`dual_agent_reason`）与自动化集成测试套件（[`tests/test_chapter_08.py`](./tests/test_chapter_08.py)）
 
 ---
 
@@ -586,6 +587,56 @@ python3 tests/test_chapter_07.py
 
 ----------------------------------------------------------------------
 Ran 5 tests in 53.933s
+
+OK
+```
+
+---
+
+## 第 08 讲实战：大脑机制外骨骼化（想象力、直觉反刍、推理与死锁破局）
+
+专栏第 08 讲深度解析《科学研究的艺术》第五、六、七、九章，揭示人脑“加压-泄压-潜意识孵化”的自然节律，交付 4 项实战能力（严格区分 2 项原生 Agent 技能与 2 项跨进程 MCP 服务）：
+
+### 1. 四大核心能力设计
+
+#### (1) 想象力激发技能 (SKILL: `imagination-spark`)
+- **定位**：原生 Agent 技能（[`system/skills/imagination-spark/`](./system/skills/imagination-spark/)）。
+- **理论依据**：第五章《想象力》之提问的艺术。运行 Why（目的性与跨界反问，温度 0.8）与 How（微观机理与物理齿轮咬合）双螺旋提问手艺，在好奇与松弛中心智自然生发突破火花。
+- **底层执行**：`python3 system/skills/imagination-spark/scripts/spark.py`
+
+#### (2) 反刍随身记与闪念捕获服务 (MCP 工具: `ruminate_spark` / `get_daily_rumination`)
+- **定位**：标准 MCP 服务工具（挂载于 [`mcp_server.py`](./mcp_server.py)）。
+- **理论依据**：第六章《直觉》之加压-泄压与随身纸笔。将突发顿悟秒记存入 `反刍/YYYY-MM-DD.md`，实现工作记忆即刻卸载（Unload），清空大脑缓存，静待潜意识拼图。
+
+#### (3) 侦探与法官双智能体推演服务 (MCP 工具: `dual_agent_reason`)
+- **定位**：标准 MCP 服务工具（挂载于 [`mcp_server.py`](./mcp_server.py)）。
+- **理论依据**：第七章《推理》之侦探与法官职能分离。敏锐侦探（温度 0.8）凭直觉大胆追踪模糊线索设想因果分支；冷面法官（温度 0.2）冷酷排伪并输出法律判决般严密的闭环裁决。
+
+#### (4) 死锁破局急救技能 (SKILL: `deadlock-breaker`)
+- **定位**：原生 Agent 技能（[`system/skills/deadlock-breaker/`](./system/skills/deadlock-breaker/)）。
+- **理论依据**：第九章《困难》之思维定势与破局三味药（执行温度 0.3）。一键开出拔电源（强制战略搁置冷冻）、拆大山（解构成软柿子切片）与胡同大爷会诊（常识大白话愣头青发问）三味猛药。
+- **底层执行**：`python3 system/skills/deadlock-breaker/scripts/breaker.py`
+
+---
+
+### 2. 一键自动化集成测试套件
+
+执行配套自动化集成测试套件，全面核验第 08 讲四大能力：
+```bash
+python3 tests/test_chapter_08.py
+```
+
+**实测输出**：
+```text
+[+] 正在启动第 08 讲集成测试，API Key: sk-6d3...
+  [✓] 想象力激发技能 (SKILL imagination-spark) 测试通过
+  [✓] 反刍随身记与闪念捕获 MCP 服务 (intuition-ruminator) 测试通过
+  [✓] 侦探与法官双智能体推演 MCP 服务 (dual-agent-reasoning) 测试通过
+  [✓] 死锁破局急救技能 (SKILL deadlock-breaker) 测试通过
+  [✓] MCP Server 第 08 讲工具挂载完整性测试通过
+
+----------------------------------------------------------------------
+Ran 5 tests in 41.873s
 
 OK
 ```

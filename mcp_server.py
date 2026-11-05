@@ -133,6 +133,56 @@ def evaluate_topic(topic_description: str, topic_title: str = "拟研课题", ou
     except Exception as e:
         return f"课题战略审查执行异常: {str(e)}"
 
+# ----------------- 专栏第 08 讲配套：闪念反刍随身记与双智能体推理 (MCP 服务工具) -----------------
+
+@app.tool()
+def ruminate_spark(spark_text: str, category: str = "闪念", tags: str = "") -> str:
+    """
+    【第 08 讲配套 MCP 工具】反刍随身记与闪念捕获服务 (intuition-ruminator)
+    基于《科学研究的艺术》第六章「直觉」之加压-泄压与随身纸笔置于脑后（Unload）。
+    将灵光一现的顿悟瞬间存入 反刍/YYYY-MM-DD.md 并清空工作记忆缓存，静待潜意识拼图。
+    
+    参数:
+        spark_text: 脑海中蹦出的直觉闪念、反常假说或微小灵感
+        category: 类别标签 (默认 "闪念", 可选 "假说", "线索", "灵感")
+        tags: 关键词标签 (如 "大模型, 潜意识")
+    """
+    try:
+        from system.scripts.ruminator import record_spark
+        return record_spark(spark_text, category=category, tags=tags, root_dir=PROJECT_ROOT)
+    except Exception as e:
+        return f"闪念捕获执行异常: {str(e)}"
+
+@app.tool()
+def get_daily_rumination(date_str: str = "") -> str:
+    """
+    【第 08 讲配套 MCP 工具】读取指定日期的反刍闪念日志 (格式 YYYY-MM-DD，留空则读取今日)
+    """
+    try:
+        from system.scripts.ruminator import read_daily_rumination
+        return read_daily_rumination(date_str=date_str, root_dir=PROJECT_ROOT)
+    except Exception as e:
+        return f"读取反刍日志异常: {str(e)}"
+
+@app.tool()
+def dual_agent_reason(clue_or_premise: str, output_file: str = "") -> str:
+    """
+    【第 08 讲配套 MCP 工具】侦探与法官双智能体推演服务 (dual-agent-reasoning)
+    基于《科学研究的艺术》第七章「推理」之侦探与法官职能严格分离。
+    敏锐侦探（温度 0.8）根据模糊线索大胆设想因果分支；冷面法官（温度 0.2）冷酷排伪并输出闭环裁决。
+    
+    参数:
+        clue_or_premise: 待推演的案件线索、业务死锁或待求证课题前提
+        output_file: 可选的 Markdown 推演专报保存路径 (如 假说/推演方案.md)
+    """
+    try:
+        from system.scripts.dual_reasoner import dual_agent_reason as run_reasoning
+        res = run_reasoning(clue_or_premise, output_path=output_file or None)
+        saved_msg = f"\n\n[+] 推演专报已归档至: {res['saved_path']}" if res.get('saved_path') else ""
+        return res["full_report"] + saved_msg
+    except Exception as e:
+        return f"双智能体推演执行异常: {str(e)}"
+
 if __name__ == "__main__":
     # 以标准 stdio 方式启动 MCP 服务
     app.run(transport="stdio")
