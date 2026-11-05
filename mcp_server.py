@@ -183,6 +183,48 @@ def dual_agent_reason(clue_or_premise: str, output_file: str = "") -> str:
     except Exception as e:
         return f"双智能体推演执行异常: {str(e)}"
 
+# ----------------- 专栏第 09 讲配套：青霉素反常机遇与张伯伦多假说打擂 (MCP 服务工具) -----------------
+
+@app.tool()
+def detect_serendipity(anomaly_description: str, context: str = "", output_file: str = "") -> str:
+    """
+    【第 09 讲配套 MCP 工具】青霉素反常机遇洞察服务 (serendipity-radar)
+    基于《科学研究的艺术》第三章「机遇」之巴斯德定律与反常机遇深挖。
+    将实验报错、意外污染、离群反常数据当成真理敲门的请柬，逆向探查颠覆性机理与突破假说 (执行温度 0.6)。
+    
+    参数:
+        anomaly_description: 遭遇的反常报错、意外事故、离群非预期数据说明
+        context: 实验背景、既有操作与原本预期 (可选)
+        output_file: 可选的 Markdown 洞察专报保存路径 (如 认知/反常机遇专报.md)
+    """
+    try:
+        from system.scripts.serendipity_radar import detect_serendipity as run_detect
+        res = run_detect(anomaly_description, context=context, output_path=output_file or None)
+        saved_msg = f"\n\n[+] 机遇洞察专报已归档至: {res['saved_path']}" if res.get('saved_path') else ""
+        return res["report"] + saved_msg
+    except Exception as e:
+        return f"反常机遇洞察执行异常: {str(e)}"
+
+@app.tool()
+def chamberlin_hypotheses(problem_or_phenomenon: str, hypothesis_count: int = 3, output_file: str = "") -> str:
+    """
+    【第 09 讲配套 MCP 工具】张伯伦多假说打擂服务 (chamberlin-hypotheses)
+    基于《科学研究的艺术》第四章「假说」之张伯伦多工作假说原则 (避免沦为单一假说的奴隶)。
+    并发生成多个互不兼容、切入角度完全不同的竞争假说，并设计排他性判决实验让其同台打擂 (执行温度 0.7)。
+    
+    参数:
+        problem_or_phenomenon: 待破解的核心难题、反常现象或业务命题
+        hypothesis_count: 并发生成的假说数量 (默认 3，可选 3-5)
+        output_file: 可选的 Markdown 打擂专报保存路径 (如 假说/多假说打擂专报.md)
+    """
+    try:
+        from system.scripts.chamberlin import generate_chamberlin_hypotheses as run_chamberlin
+        res = run_chamberlin(problem_or_phenomenon, hypothesis_count=hypothesis_count, output_path=output_file or None)
+        saved_msg = f"\n\n[+] 多假说打擂专报已归档至: {res['saved_path']}" if res.get('saved_path') else ""
+        return res["report"] + saved_msg
+    except Exception as e:
+        return f"多假说打擂执行异常: {str(e)}"
+
 if __name__ == "__main__":
     # 以标准 stdio 方式启动 MCP 服务
     app.run(transport="stdio")

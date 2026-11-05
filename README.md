@@ -14,6 +14,7 @@
 * **第 06 讲**：[`mcp_server.py`](./mcp_server.py)（方案 A: 标准 MCP 扩展）、[`scripts/harness_tools.py`](./scripts/harness_tools.py)（方案 B: CLI 独立脚本工具）、[`.agents/skills/study-harness-ops/`](./.agents/skills/study-harness-ops/)（方案 C: 本地专属 Skill）与 [`scripts/test_three_modes.sh`](./scripts/test_three_modes.sh)（三大模式一键测试）
 * **第 07 讲**：科学家潜能诊断技能（[`system/skills/scientist-profiler/`](./system/skills/scientist-profiler/)）、异构双智能体协同与课题打分 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`collaborate_duo`、`evaluate_topic`）与自动化集成测试套件（[`tests/test_chapter_07.py`](./tests/test_chapter_07.py)）
 * **第 08 讲**：想象力激发技能（[`system/skills/imagination-spark/`](./system/skills/imagination-spark/)）、死锁破局急救技能（[`system/skills/deadlock-breaker/`](./system/skills/deadlock-breaker/)）、闪念反刍与双智能体推演 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`ruminate_spark`、`dual_agent_reason`）与自动化集成测试套件（[`tests/test_chapter_08.py`](./tests/test_chapter_08.py)）
+* **第 09 讲**：实验策划技能（[`system/skills/experiment-planner/`](./system/skills/experiment-planner/)）、达尔文打脸笔记技能（[`system/skills/darwin-critic-observer/`](./system/skills/darwin-critic-observer/)）、青霉素反常机遇洞察与张伯伦多假说打擂 MCP 服务（[`mcp_server.py`](./mcp_server.py) 工具：`detect_serendipity`、`chamberlin_hypotheses`）与自动化集成测试套件（[`tests/test_chapter_09.py`](./tests/test_chapter_09.py)）
 
 ---
 
@@ -637,6 +638,56 @@ python3 tests/test_chapter_08.py
 
 ----------------------------------------------------------------------
 Ran 5 tests in 41.873s
+
+OK
+```
+
+---
+
+## 第 09 讲实战：实证检验外骨骼化（实验策划、反常机遇、多假说打擂与达尔文打脸笔记）
+
+专栏第 09 讲《捡回被扔掉的青霉素》聚焦科研实证检验与反常机遇的转化心法，深度融合贝弗里奇《科学研究的艺术》第二章（实验）、第三章（机遇）、第四章（假说）与第八章（观察），交付 4 项实战能力（严格区分 2 项原生 Agent 技能与 2 项跨进程 MCP 服务）：
+
+### 1. 四大核心能力设计
+
+#### (1) 实验策划技能 (SKILL: `experiment-planner`)
+- **定位**：原生 Agent 技能（[`system/skills/experiment-planner/`](./system/skills/experiment-planner/)）。
+- **理论依据**：第二章《实验》之渐进三步法策划与对照防骗铁律。强制推行 Pilot 极小试点探路、大稀释度摸底观测与大范围精准海选三阶推进，设立严密阴性/阳性基线对照，坚决杜绝约翰·亨特式无对照自欺（执行温度 0.2）。
+- **底层执行**：`python3 system/skills/experiment-planner/scripts/planner.py`
+
+#### (2) 青霉素反常机遇洞察服务 (MCP 工具: `detect_serendipity`)
+- **定位**：标准 MCP 服务工具（挂载于 [`mcp_server.py`](./mcp_server.py)）。
+- **理论依据**：第三章《机遇》之巴斯德定律与反常机遇深挖。严禁将实验报错、意外污染或离群反常数据当垃圾倒掉，逆向审计其对既定偏见的破产冲击，提炼青霉素级的突破假说并给出低成本顺藤摸瓜追踪指南（执行温度 0.6）。
+
+#### (3) 张伯伦多假说打擂服务 (MCP 工具: `chamberlin_hypotheses`)
+- **定位**：标准 MCP 服务工具（挂载于 [`mcp_server.py`](./mcp_server.py)）。
+- **理论依据**：第四章《假说》之张伯伦多工作假说原则。彻底粉碎“单一假说视若己出”的认知牢笼，针对难题并发提出 3~4 个互不兼容、切入角度完全不同的假说，并设计排他性判决实验（Crucial Test）让其同台打擂比拼（执行温度 0.7）。
+
+#### (4) 达尔文打脸笔记技能 (SKILL: `darwin-critic-observer`)
+- **定位**：原生 Agent 技能（[`system/skills/darwin-critic-observer/`](./system/skills/darwin-critic-observer/)）。
+- **理论依据**：第八章《观察》与第四章《假说》之达尔文黄金法则（3 分钟打脸抢救机制）与客观事实/主观脑补隔离。以极端冷峻的挑剔法官姿态直击心爱假说的死穴与阿喀琉斯之踵，极限测定盲区并出具纯客观再观察清单（执行温度 0.2）。
+- **底层执行**：`python3 system/skills/darwin-critic-observer/scripts/darwin.py`
+
+---
+
+### 2. 一键自动化集成测试套件
+
+执行配套自动化集成测试套件，全面核验第 09 讲四大能力：
+```bash
+python3 tests/test_chapter_09.py
+```
+
+**实测输出**：
+```text
+[+] 正在启动第 09 讲集成测试，API Key: sk-6d3...
+  [✓] 实验策划技能 (SKILL experiment-planner) 测试通过
+  [✓] 青霉素反常机遇洞察 MCP 服务 (serendipity-radar) 测试通过
+  [✓] 张伯伦多假说打擂 MCP 服务 (chamberlin-hypotheses) 测试通过
+  [✓] 达尔文打脸笔记技能 (SKILL darwin-critic-observer) 测试通过
+  [✓] MCP Server 工具挂载完整性测试通过
+
+----------------------------------------------------------------------
+Ran 5 tests in 48.301s
 
 OK
 ```
